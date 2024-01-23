@@ -1,0 +1,156 @@
+---
+title: "Lab 2 - Build a map"
+output: html_notebook
+---
+
+Loading in required packages
+```{r}
+require(tidyverse)
+require(sf)
+require(tigris)
+require(geodata)
+require(terra)
+require(colorspace)
+require(tidyterra)
+require(ggnewscale)
+require(cowplot)
+require(FedData)
+require(ggspatial)
+```
+
+Load in needed files
+```{r}
+claibornesf <- st_read("/vsicurl/https://github.com/14jukowalski/SpatialEcology/raw/main/Lab_2/Claiborne_shapefile/Claiborne.shp")
+
+receiversf <- st_read("/vsicurl/https://github.com/14jukowalski/SpatialEcology/raw/main/Lab_2/receiverpoints_shapefile/Receiverpoints.shp")
+```
+
+plot shapefiles to make sure they loaded correctly
+```{r}
+plot(st_geometry(claibornesf))
+plot(st_geometry(receiversf))
+```
+
+Next, create a bounding box around the study area so it can be plotted on a larger map
+```{r}
+claiborne = st_bbox(claibornesf)
+claiborne
+
+claiborne = claiborne + c(-20000, -20000, 20000, 20000)
+claiborne
+
+claiborne = st_as_sfc(claiborne)
+plot(claiborne)
+```
+
+To create zoomed-out map, bring in shapefile of Alabama and plot bounding box on the shapefile
+```{r}
+Alabama = states() %>% 
+  filter(NAME=='Alabama')
+
+plot(st_geometry(Alabama))
+
+st_crs(Alabama)$proj4string
+
+Alabama = st_transform(Alabama, st_crs(claibornesf))
+
+##overlay map
+plot(st_geometry(Alabama))
+plot(claiborne, col='red', add=T)
+```
+
+Now let's create the zoomed in map
+I am going to make a smaller bounding box for this map so that we can more easily see the data 
+```{r}
+claiborne1 = st_bbox(claibornesf)
+claiborne1
+
+claiborne1 = claiborne1 + c(-1000, -1000, 1000, 1000)
+claiborne1
+
+claiborne1 = st_as_sfc(claiborne1)
+plot(claiborne1)
+```
+
+Next, overlay the a raster containing land use from the nlcd in the FedData package on the claiborne spatial file
+```{r}
+claiborne_nlcd <- get_nlcd(
+  template = claiborne1,
+  label = "Claiborne",
+  year = 2021,
+  dataset = "landcover",
+  landmass = "L48")
+
+plot(claiborne_nlcd)
+
+```
+
+Before putting everything together, reproject the object that was just created in UTMs
+```{r}
+claiborne_nlcd = project(claiborne_nlcd, crs(claibornesf, proj=T))
+```
+
+Not put everything together with cowplot starting with the zoomed-out map
+```{r}
+zoomedOut = ggplot()+
+  geom_sf(data = Alabama)+
+  geom_sf(data = claiborne, fill=NA, color='red')+
+  annotation_scale(location="br")+
+  annotation_north_arrow(location = "tr")
+zoomedOut
+
+zoomedOut = zoomedOut +
+  theme_bw()+ #Gets rid of most of the colors
+  theme(panel.grid=element_blank(), #Removes the gridlines
+        axis.text=element_blank(), #Removes the axis text
+        axis.ticks=element_blank(), #Removes the axis tick marks
+        panel.border=element_blank()) #Removes the frame around the graph
+zoomedOut
+```
+
+Build the zoomed in map by overlaying the site shapefile and the receiver locations onto the land cover object
+```{r}
+zoomedIn = ggplot()+
+  geom_spatraster(data = claiborne_nlcd)
+zoomedIn
+
+zoomedIn = zoomedIn + 
+  new_scale_fill()+
+  geom_sf(data=claibornesf, alpha=0.5)
+zoomedIn
+
+zoomedIn = zoomedIn + 
+  new_scale_fill()+
+  geom_sf(data=receiversf, color = 'black')+
+  annotation_scale()+
+  annotation_north_arrow(location = "br")
+zoomedIn
+
+zoomedIn = zoomedIn +
+  theme(panel.grid=element_blank(), #Removes the gridlines
+        axis.text=element_blank(), #Removes the axis text
+        axis.ticks=element_blank(), #Removes the axis tick marks
+        panel.border=element_blank()) #Removes the frame around the graph
+zoomedIn
+```
+
+Combine the zoomed-in and zoomed-out maps onto one figure
+```{r}
+plot_grid(zoomedOut, zoomedIn)
+```
+
+Organize the figure so that it is not messy and looks nice
+```{r}
+legend = get_legend(zoomedIn)
+ggdraw(legend)
+
+zoomedIn1 = zoomedIn + theme(legend.position='none')
+
+supportingFig = plot_grid(zoomedOut, ggdraw(legend), ncol=2, rel_heights = c(0.5, 1))
+
+supportingFig
+
+plot_grid(zoomedIn1, supportingFig, rel_widths=c(1.2, 1.6))
+```
+
+This map represents an array of acoustic telemetry receivers below Claiborne Lock and Dam on the Alabama River. The receiver array will be used to track fish movements below the dam to determine how fish use the area below the dam. The zoomed out map shows where Claiborne Lock and Dam is located in the state of Alabama. I got the state of Alabama shape file from the tigris package and overlaid a bounding box around Claiborne Lock and Dam on the Alabama Shape file. Note that for this assignment I did make the extent rectangle on the zoomed-out map larger than the size of the study area in the zoomed-in map so that the extent box could be seen rather than being just a small dot on the map. I chose these spatial elements to show where the study site is in reference to an object everyone is familiar with, the state of Alabama. The zoomed-in map represents the site of this study and surrounding area. The raster is land cover data from the nlcd in the FedData package. I chose to include land cover data because it shows where the river is relative to the surrounding land and what the surrounding floodplain looks like. The shaded polygon represents the open water area below Claiborne Lock and Dam where this study will occur and the black points represent the location of individual acoustic receivers in the array. I created the shape files for both the study area and receiver points in ArcMap Pro and loaded those shape files in r. I chose these spatial elements to visualize the area in which the study will occur and the position of receivers in the study site where the data will be collected. The final figure has three columns because I had a difficult time getting the whole supporting figure to fit in the final figure in R markdown with out part of it being cropped out. However,it worked to have the supplemental figure stacked when I ran it in a R script.   
