@@ -20,9 +20,9 @@ require(ggspatial)
 
 Load in needed files
 ```{r}
-claibornesf <- st_read("/Volumes/NO NAME/USB Drive/PhD research and documents/Spatial Ecology Class/Labs/Lab 2/Claiborne Shapefile/Claiborne.shp")
+claibornesf <- st_read("/vsicurl/https://github.com/14jukowalski/SpatialEcology/raw/main/Lab_2/Claiborne_shapefile/Claiborne.shp")
 
-receiversf <- st_read("/Volumes/NO NAME/USB Drive/PhD research and documents/Spatial Ecology Class/Labs/Lab 2/Receiver Points/Receiver points.shp")
+receiversf <- st_read("/vsicurl/https://github.com/14jukowalski/SpatialEcology/raw/main/Lab_2/receiverpoints_shapefile/Receiverpoints.shp")
 ```
 
 plot shapefiles to make sure they loaded correctly
@@ -146,11 +146,15 @@ ggdraw(legend)
 
 zoomedIn1 = zoomedIn + theme(legend.position='none')
 
-supportingFig = plot_grid(zoomedOut, ggdraw(legend), ncol=1, rel_heights = c(0.5, 1))
+supportingFig = plot_grid(zoomedOut, ggdraw(legend), ncol=2, rel_heights = c(0.5, 1))
 
 supportingFig
 
-plot_grid(zoomedIn1, supportingFig, rel_widths=c(1, 0.5))
+plot_grid(zoomedIn1, supportingFig, rel_widths=c(1.2, 1.6))
 ```
 
-This map represents an array of acoustic telemetry receivers below Claiborne Lock and Dam on the Alabama River. The receiver array will be used to track fish movements below the dam to determine how fish use the area below the dam. The zoomed out map in the upper right corner shows where Claiborne Lock and Dam is located in the state of Alabama. I got the state of Alabama shapefile from the tigris package and overlayed a bounding box around Claiborne Lock and Dam on the Alabama Shapefile. I chouse these spatial elements to show where the study site is in reference to an object everyone is familiar with, the state of Alabama. The zoomed-in map represents the site of this study and surrounding area. The raster is land cover data fron the nlcd in the FedData package. I chose to include landcover data because it shows where the river is in the system and what the surronding floodplain looks like. The shaded polygon represents the open water area below Claiborne Lock and Dam where this study will occur and the black points represent the location of individual acoustic receivers in the array. I chose these spatial elements to visulize the area in which the study will occur and the position of receivers in that study site where the data will be collected.  
+This map represents an array of acoustic telemetry receivers below Claiborne Lock and Dam on the Alabama River. The receiver array will be used to track fish movements below the dam to determine how fish use the area below the dam. The zoomed out map shows where Claiborne Lock and Dam is located in the state of Alabama. I got the state of Alabama shape file from the tigris package and overlaid a bounding box around Claiborne Lock and Dam on the Alabama Shape file. Note that for this assignment I did make the extent rectangle on the zoomed-out map larger than the size of the study area in the zoomed-in map so that the extent box could be seen rather than being just a small dot on the map. I chose these spatial elements to show where the study site is in reference to an object everyone is familiar with, the state of Alabama. The zoomed-in map represents the site of this study and surrounding area. The raster is land cover data from the nlcd in the FedData package. I chose to include land cover data because it shows where the river is relative to the surrounding land and what the surrounding floodplain looks like. The shaded polygon represents the open water area below Claiborne Lock and Dam where this study will occur and the black points represent the location of individual acoustic receivers in the array. I created the shape files for both the study area and receiver points in ArcMap Pro and loaded those shape files in r. I chose these spatial elements to visualize the area in which the study will occur and the position of receivers in the study site where the data will be collected. The final figure has three columns because I had a difficult time getting the whole supporting figure to fit in the final figure in R markdown with out part of it being cropped out. However,it worked to have the supplemental figure stacked when I ran it in a R script.   
+
+# Grade
+
+$\color{red}{\text{Awesome work, Justin.}}$
