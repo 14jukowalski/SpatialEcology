@@ -67,6 +67,8 @@ plot(X,Yvar)
 
 As the raster grain size is scaled up the mean value stayed the same and the variance decreased. I believe the mean stayed the same because even though the the grain got larger values of the larger grain raster were created by taking the mean of the smaller raster cells, therefore when you take the mean of the larger cells the mean value would still be the same as the mean of the smaller grain raster. I believe that the variance of the larger grain raster decreased because when the mean values of the smaller grain raster cells were taken to make the larger grain, those combined averages were closer to the true mean. As a result, the variance of the raster with the larger grain cells was smaller.     
 
+$\color{red}{\text{Nice. +4}}$
+
 ## Challenge 2 (4 points)
 
 **Identify a situation in which you might use a summary function other than the mean to calculate new cell values when you scale up the grain of a raster (e.g., median, mode, minimum, maximum, etc.). Repeat the effort from Challenge 1 using this alternate function. Again, create two scatterplots showing how the mean and variance values of the raster change as you scale up the cell size by factors of 2, 5, and 10. Do you see a similar pattern? Compare and contrast your findings with those from Challenge 1.**
@@ -119,11 +121,15 @@ plot(X,Yvar)
 
 Using median value to scale up the grain of the raster resulted in differing estimates of mean raster value, although only slight differences,  and variance decreased as raster grain size increased.  Decreasing in variance occurred when using both mean and median to combine raster cells to make a larger grain. This makes sense as both mean and median would expect to be close to the true mean when values are combined leading to lower variance of the final mean of value of the raster. When using median to combine raster cells the mean value changed slightly as grain size increased, this observation did not occur when using mean to combine raster cell values. This is likely because when taking the median value of the cells when combining the value will not be the true mean and this will lead to slight differences when the mean of the whole raster is taken. However, there was no apparent pattern between grain size and mean value of the raster and the values were close to the true mean (5) indicating that while there is some change in the final mean it is not biased. Median could be a good summary function to use if you want to remove the bias of outlier/extreme raster cells when increasing the grain of your raster.     
 
+$\color{red}{\text{Nice. +4}}$
+
 ## Challenge 3 (2 points)
 
 **Recall that before we calculated forest cover, we cropped our NLCD raster to minimize its size and the computing effort necessary from our poor little computers. How might that affect our ability to evaluate the scale at which five-lined skinks respond to forest cover? Why?**
 
 If the raster is cropped too small it may limit the scale that can be tested and the optimal scale may not be measurable within the cropped extent of the raster. This is because often the true scale that the data should be analyzed at is unknown and if the raster is cropped too much important habitat characteristics around each point may be excluded and the optimal scale might not be able to be measured. 
+
+$\color{red}{\text{Perfect. +2}}$
 
 ## Challenge 4 (4 points)
 
@@ -229,6 +235,8 @@ forestData %>%
 ```
 In general there is a positive correlation between all spatial scales in terms of forest cover. However, the positive correlation is very weak between the smallest and largest spatial scales and increases as both spatial scales increase. For example, the correlation is highest (r = 0.98) between the 4 km and 5 km spatial scales, and lowest (r = 0.10) between 500m and 5 km. Practically, this means that if there is high proportion of tree cover at 4 km there is likely high tree cover at 5 km, but if there is high tree cover at 500 m it is less likely that there will he high tree cover at 5 km.   
 
+$\color{red}{\text{Nice! +4}}$
+
 ## Challenge 5 (4 points)
 
 **Fit 8 logistic regression models (a null model and one for each of the 7 forest scales). Compare these models using AICc. Which scale do you think represents the critical or characteristic scale at which forest cover affects skink presence? Is this scale clearly better than the others, or is there some ambiguity? What are some mechanisms by which forest cover could affect skink presence at this scale? What is your overall conclusion regarding how forest cover affects skink presence (i.e., take a look at the betas)?**
@@ -261,7 +269,9 @@ ggplot(effects, aes(x=model))+
   geom_errorbar(aes(ymin=lcl, ymax=ucl))
 ```
 
-Based on the results of the AIC, the 2 km model seems to be the best for representing the critical or characteristic scale at which forest cover affects skink presence of the models considered. However, the 3 km, 4 km, and 5 km models had delta AIC values within two of the best model and should also be considered for scales at which forest cover affects skink presence. Since skinks are small lizards they may depend on fallen and decaying tree/logs for shelter and food, larger forested areas likely have more trees and more fallen over trees that provide this needed habitat. Additionally, forested areas may provide more cover and protection from predators for skinks when they are dispersing, where as fragmented area of forest would provide less cover for skinks. Overall, it appears that forest cover has a positive influence on skink presence as all of the betas for forest cover are positive and betas increase as forest cover increases until about 2 km then the betas even out and are similar for 2 km, 3 km, 4 km, and 5 km of forest cover.       
+Based on the results of the AIC, the 2 km model seems to be the best for representing the critical or characteristic scale at which forest cover affects skink presence of the models considered. However, the 3 km, 4 km, and 5 km models had delta AIC values within two of the best model and should also be considered for scales at which forest cover affects skink presence. Since skinks are small lizards they may depend on fallen and decaying tree/logs for shelter and food, larger forested areas likely have more trees and more fallen over trees that provide this needed habitat. Additionally, forested areas may provide more cover and protection from predators for skinks when they are dispersing, where as fragmented area of forest would provide less cover for skinks. Overall, it appears that forest cover has a positive influence on skink presence as all of the betas for forest cover are positive and betas increase as forest cover increases until about 2 km then the betas even out and are similar for 2 km, 3 km, 4 km, and 5 km of forest cover.     
+
+$\color{red}{\text{Perfect. +4}}$
 
 
 ## Challenge 6 (2 points)
@@ -269,4 +279,6 @@ Based on the results of the AIC, the 2 km model seems to be the best for represe
 **If you encounter ambiguity in identifying the characteristic scale of an effect, can you come up with a clever way to condense the information in the multi-scale variables into just one or two? When might it be ok to include two covariates in the same model (think multiple regression) that represent the same ecological feature measured at different scales (e.g., forest cover at 1 km AND forest cover at 5 km in the same model)? I can think of both a biological and a statistical answer to this question.**
 
 One possible way to condense the variables would be to take the average values of the models that should be considered and run that model. In the example above this would be averaging the 2 km, 3km,  4 km, and 5 km models and using a model for 3.5 km. If I did this however in my results I would be sure to include which models were the best of those considered and that I took the average of those models to get one model. One reason that you might consider including two covariates in the same model is that you may expect two spatial spatial scales to have independent influences on the organism being studied. For example, it might be important for a beaver to have water access at a small scale (1 km) and access to suitable size trees at a 5 km scale for feeding and dam building. If there is only water at a 1 km scale but not an adequate amount of trees, or only the needed tree size at 5 km scale but no water beavers may not be present. If both needs are satisfied beavers might be present and the best model would have two covariates.   
+
+$\color{red}{\text{It's also important that you don't include two highly correlated variables in the same model. +2}}$
 
