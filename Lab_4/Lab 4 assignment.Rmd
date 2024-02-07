@@ -1,0 +1,573 @@
+---
+title: "Lab 4 Assignment - Landcover"
+output:
+  html_document:
+    df_print: paged
+---
+
+
+
+```{r}
+rm(list=ls())
+require(Voss)
+require(tidyverse)
+require(terra)
+require(FedData)
+require(sf)
+require(tidyterra)
+require(landscapemetrics)
+```
+
+## Challenge 1 (4 points)
+
+**The landscapemetrics package has functions for calculating 12 patch-level metrics. Calculate all 12 of these for every forest patch in our nlcdSimple raster (using the 8-direction rule). This will result in 12 unique values associated with each forest patch. Use the chart.Correlation() function from the PerformanceAnalytics package to examine the correlation among all 12 of these variables. What patterns do you notice, and what do they tell you about the uniqueness or redundancy of the patch-level metrics you calculated?**
+
+```{r}
+#Create the nlcdSimple raster
+studyArea = st_read('/vsicurl/https://github.com/ValenteJJ/SpatialEcology/raw/main/Week4/studyArea.shp')
+nlcd = get_nlcd(studyArea, label='AlLandscape', year=2011)
+plot(nlcd)
+nlcdSimple = nlcd
+nlcdSimple[nlcdSimple==11] = 1 #Wet areas are a 1 now
+nlcdSimple[nlcdSimple %in% c(21, 22, 23, 24)] = 2 #All developed areas are 2
+nlcdSimple[nlcdSimple %in% c(31, 52)] = 3 #Barren land and shrub/scrub are 3
+nlcdSimple[nlcdSimple %in% c(41,42,43)] = 4 #All forest types are 4
+nlcdSimple[nlcdSimple == 71] = 5 #Grassland is 5
+nlcdSimple[nlcdSimple %in% c(81,82)] = 6 #And agriculture is 6
+
+#Give these numbers category names
+tmp = data.frame('ID' = c(1, 2, 3, 4, 5, 6),
+                 'category' = c('wetland', 'developed', 'open', 'forest', 'grassland', 'agriculture'))
+nlcdSimple = categories(nlcdSimple, value=tmp)
+
+#visualize the raster
+ggplot(nlcdSimple, aes(x=x, y=y, fill=category)) +
+  geom_raster()+
+  scale_fill_manual(values=c('blue', 'black', 'gray', 'darkolivegreen', 'orange', 'yellow'))
+
+#Categorize raster as forest or non-forest to define the patches
+forest = nlcdSimple %>% 
+  setValues(NA)
+forest[nlcdSimple ==4] = 1
+plot(forest)
+
+forestWith0 = forest
+forestWith0[is.na(forestWith0)] = 0
+
+#Calculate the metrics
+patchArea = lsm_p_area(forest, directions=8)
+patchCore = lsm_p_core(forest, directions=8)
+patchEnn = lsm_p_enn(forest, directions=8)
+patchPerim = lsm_p_perim(forest, directions=8)
+patchPara = lsm_p_para(forest, directions=8)
+patchCAI = lsm_p_cai(forest, directions=8)
+patchCircle= lsm_p_circle(forest, directions=8)
+patchContig= lsm_p_contig(forest, directions=8)
+patchFrac= lsm_p_frac(forest, directions=8)
+patchGyrate = lsm_p_gyrate(forest, directions=8)
+patchNcore= lsm_p_ncore(forest, directions=8)
+patchShape= lsm_p_shape(forest, directions=8)
+
+
+#create correlation matrix
+patchmatrix1 = rbind(patchArea, patchCore, patchEnn, patchPerim, patchPara, patchCAI, patchCircle,       patchContig, patchFrac, patchGyrate, patchNcore, patchShape)
+
+patchmatrix2 = pivot_wider(patchmatrix1, names_from = metric, values_from = value)
+patchmatrix = patchmatrix2 %>%
+  select(area:shape)
+PerformanceAnalytics::chart.Correlation(patchmatrix, histogram=F)
+
+```
+
+
+Most patch metrics calculated are positively correlated to each other. There are a few metrics (elucidation nearest neighbor and perimeter to area ratio) that are negatively correlated to the other metrics, although they are positively correlated to each other. since most correlations were in the same direction and most of the correlation coefficients were fairly high (r > 0.6), redundancy is high in the patch metrics calculated. Elucidation nearest neighbor was the most unique metric and had relatively low correlation with all the other metrics (r < 0.54). The redundancy among metrics shows that calculating all of the metrics is not likely necessary and choosing a few metrics of interest is likely adequate for making conclusions.   
+
+
+## Challenge 2 (4 points)
+
+**In our lab, we used the 8-direction or "queen" rule to delineate patches. Using the nlcdSimple raster we created, explore the differences in patch characteristics if you were to use the 4-direction or "rook" rule for delineating patches. Calculate the following class-level metrics for forest cover for both the queen and rook patch delineation rules: number of patches, mean patch size, standard deviation in patch size, nearest-neighbor distance, and total edge length. What patterns do you notice? When might it be appropriate to use one rule vs. the other?**
+
+```{r}
+#Number of patches
+numbpatchQ = lsm_c_np(forest, directions=8)
+numbpatchQ
+
+numbpatchR = lsm_c_np(forest, directions=4)
+numbpatchR
+
+#Mean patch size
+meanpatchsizeQ = lsm_c_area_mn(forest, directions =8)
+meanpatchsizeQ
+
+meanpatchsizeR = lsm_c_area_mn(forest, directions =4)
+meanpatchsizeR
+
+#SD in patch size
+SDpatchsizeQ = lsm_c_area_sd(forest, directions = 8)
+SDpatchsizeQ
+
+SDpatchsizeR = lsm_c_area_sd(forest, directions = 4)
+SDpatchsizeR
+
+#nearset neighbor distance
+NNDQ = lsm_c_enn_mn(forest, directions = 8)
+NNDQ
+
+NNDR = lsm_c_enn_mn(forest, directions = 4)
+NNDR
+
+#Total edge length NOT WORKING
+totaledgeQ = lsm_c_te(forestWith0, directions = 8)
+totaledgeQ
+
+totaledgeR = lsm_c_te(forestWith0, directions = 4)
+totaledgeR
+```
+
+In general there are fewer patches of a larger size generated using the queen rule to generate patches as opposed to using the rook rule. Additionally, patches generated using the queen rule have a larger standard deviation in area, and are farther apart from one another than patches calculated using the rook approach. Total edge area is the same for both rook and queen rules. Using the queen approach may be more appropriate when considering species that do not need interior/core habitat because they will be able to move from patch to patch more easily if patches are only touching at corners than a species that needs more interior/core habitat. Species that needs more internal/core habitat likely will not spend a lot of time at the edge of habitat patches and therefore will likely not move to another area if only the corners of the patch are touching, therefore the two patches should be analyzed separately. It is not likely the species would move between single blocks in the rook approach either, but using the rook approach would at least reduce the amount of patches only connected by a small area (i.e. a corner).         
+
+
+## Challenge 3 (4 points)
+
+
+**Using the same zoomed-in study area that we used in the lab, download NLCD raster data for the years 2001 and 2019 and simplify these rasters into 6 landcover categories (wet, developed, barren, forest, grassland, and agriculture). Plot these two rasters. What are some of the initial changes you notice between 2001 and 2019?**
+
+```{r}
+#2001 raster
+studyArea01 = st_read('/vsicurl/https://github.com/ValenteJJ/SpatialEcology/raw/main/Week4/studyArea.shp')
+nlcd01 = get_nlcd(studyArea01, label='AlLandscape', year=2001)
+plot(nlcd01)
+nlcdSimple01 = nlcd01
+nlcdSimple01[nlcdSimple01==11] = 1 #Wet areas are a 1 now
+nlcdSimple01[nlcdSimple01 %in% c(21, 22, 23, 24)] = 2 #All developed areas are 2
+nlcdSimple01[nlcdSimple01 %in% c(31, 52)] = 3 #Barren land and shrub/scrub are 3
+nlcdSimple01[nlcdSimple01 %in% c(41,42,43)] = 4 #All forest types are 4
+nlcdSimple01[nlcdSimple01 == 71] = 5 #Grassland is 5
+nlcdSimple01[nlcdSimple01 %in% c(81,82)] = 6 #And agriculture is 6
+
+#Give these numbers category names
+tmp01 = data.frame('ID' = c(1, 2, 3, 4, 5, 6),
+                 'category' = c('wetland', 'developed', 'barren', 'forest', 'grassland', 'agriculture'))
+nlcdSimple01 = categories(nlcdSimple01, value=tmp01)
+
+#visualize the raster
+ggplot(nlcdSimple01, aes(x=x, y=y, fill=category)) +
+  geom_raster()+
+  scale_fill_manual(values=c('blue', 'black', 'gray', 'darkolivegreen', 'orange', 'yellow'))
+
+#2019 raster
+studyArea19 = st_read('/vsicurl/https://github.com/ValenteJJ/SpatialEcology/raw/main/Week4/studyArea.shp')
+nlcd19 = get_nlcd(studyArea19, label='AlLandscape', year=2019)
+plot(nlcd19)
+nlcdSimple19 = nlcd19
+nlcdSimple19[nlcdSimple19==11] = 1 #Wet areas are a 1 now
+nlcdSimple19[nlcdSimple19 %in% c(21, 22, 23, 24)] = 2 #All developed areas are 2
+nlcdSimple19[nlcdSimple19 %in% c(31, 52)] = 3 #Barren land and shrub/scrub are 3
+nlcdSimple19[nlcdSimple19 %in% c(41,42,43)] = 4 #All forest types are 4
+nlcdSimple19[nlcdSimple19 == 71] = 5 #Grassland is 5
+nlcdSimple19[nlcdSimple19 %in% c(81,82)] = 6 #And agriculture is 6
+
+#Give these numbers category names
+tmp19 = data.frame('ID' = c(1, 2, 3, 4, 5, 6),
+                 'category' = c('wetland', 'developed', 'barren', 'forest', 'grassland', 'agriculture'))
+nlcdSimple19 = categories(nlcdSimple19, value=tmp19)
+
+#visualize the raster
+ggplot(nlcdSimple19, aes(x=x, y=y, fill=category)) +
+  geom_raster()+
+  scale_fill_manual(values=c('blue', 'black', 'gray', 'darkolivegreen', 'orange', 'yellow'))
+```
+
+The changes that I first notice when comparing the 2001 and 2019 rasters is that there is more forest cover in the 2001 raster than in the 2019 raster. In 2019 there is more barren and grassland and cover in the middle and portion of the raster, and more agriculture at the top and bottom of the raster. 
+
+**Quantify this at the class level by calculating and reporting the changes in (1) the total amount of each land cover type (2) mean patch size for each land cover type, and (3) mean nearest neighbor distance for each cover type between the years 2011 and 2019. Give a short description of how you interpret the changes in these values.**
+
+```{r}
+#Total land cover
+#2001
+totalArea01 = lsm_c_ca(nlcdSimple01, direction = 8)
+totalArea01
+#2019
+totalArea19 = lsm_c_ca(nlcdSimple19, direction = 8)
+totalArea19
+
+#Mean patch size
+#2001
+meanpatchsize01 = lsm_c_area_mn(nlcdSimple01, direction =8)
+meanpatchsize01
+#2019
+meanpatchsize19 = lsm_c_area_mn(nlcdSimple19, direction =8)
+meanpatchsize19
+
+#Mean NND
+#2001
+NND01 = lsm_c_enn_mn(nlcdSimple01, direction = 8)
+NND01
+#2019
+NND19 = lsm_c_enn_mn(nlcdSimple19, direction = 8)
+NND19
+```
+
+Total amount of land cover type and mean patch size followed similar trends with barren, grassland, and agriculture land type increasing, forest land type decreasing, and wetland and developed land types staying about the same. For mean distance to nearest neighbor wetland land type stayed the same while the values for all other land cover types decreased. However, the mean nearest neighbor distance for barren and grassland patches greatly decreased form 2001 to 2019, whereas developed, forest, and agriculture only decreased slightly. Increasing total cover and average patch size of barren, grassland, and agriculture makes sense as those land cover types grew at the expense of the forest land cover type. Barren and grassland land cover types had the largest growth so it makes sense that the mean distance to nearest neighbor would decrease as the patches grew closer to each other as they expanded. The other land types also decreased as they either grew slightly closer, or were fragmented resulting in patches that were once connected being fragmented patches that are "closer together".   
+
+**Quantify these changes at the landscape level by calculating and reporting on changes in the (1) Shannon diversity and (2) Shannon evenness of the landscapes at the different time points. Give a short description of how you interpret the changes in these values.**
+
+```{r}
+#Shannon diversity
+#2001
+sdi01 = lsm_l_shdi(nlcdSimple01)
+sdi01
+#2019
+sdi19 = lsm_l_shdi(nlcdSimple19)
+sdi19
+
+#Shannon evenness
+#2001
+sei01 = lsm_l_shei(nlcdSimple01)
+sei01
+#2019
+sei19 = lsm_l_shei(nlcdSimple19)
+sei19
+```
+
+The 2019 landcover raster has a higher Shannon Diversity Index than the 2001 raster. This is likely because the 2001 raster is mostly made up of forest and agriculture land types, but in 2019 when more of the forest land type is removed there is more barren and grassland cover adding to the diversity of the plot of land. Similarly, Shannon's Evenness Index has a lower value for 2001 compared to 2019. This makes sense as the majority of the 2001 plot is made up primarily by only two dominant land types whereas the 2019 plot has more landcover types in similar proportions that make up the raster.      
+
+
+
+## Challenge 4 (4 points)
+
+**Use the voss2d() function to simulate a surface where g = 7 and H = 0.5. From that, create 9 'landscapes' with 10%, 20%, 30%, ..., 90% threshold values. The '1' values here can represent anything your imagination comes up with. It could be forest cover, cover of some other land cover type, bodies of water, temperatures above a threshold, etc. I suggest you set the seed for your simulation value so that you get the same outcome each time you run the code. Plot these landscapes and comment on what patterns you see changing as the value increases from a 10% cover to 90% cover.**
+
+```{r}
+set.seed(23)
+
+#Creat model
+vossModel = voss2d(g=7, H=0.5)
+vossModel = rast(vossModel$z)
+plot(vossModel)
+
+# 10% cover
+threshold10 = quantile(as.matrix(vossModel), prob=0.1)
+voss10 = ifel(vossModel > threshold10, 0, 1)
+plot(voss10)
+
+# 20% cover
+threshold20 = quantile(as.matrix(vossModel), prob=0.2)
+voss20 = ifel(vossModel > threshold20, 0, 1)
+plot(voss20)
+
+# 30% cover
+threshold30 = quantile(as.matrix(vossModel), prob=0.3)
+voss30 = ifel(vossModel > threshold30, 0, 1)
+plot(voss30)
+
+# 40% cover
+threshold40 = quantile(as.matrix(vossModel), prob=0.4)
+voss40 = ifel(vossModel > threshold40, 0, 1)
+plot(voss40)
+
+# 50% cover
+threshold50 = quantile(as.matrix(vossModel), prob=0.5)
+voss50 = ifel(vossModel > threshold50, 0, 1)
+plot(voss50)
+
+# 60% cover
+threshold60 = quantile(as.matrix(vossModel), prob=0.6)
+voss60 = ifel(vossModel > threshold60, 0, 1)
+plot(voss60)
+
+# 70% cover
+threshold70 = quantile(as.matrix(vossModel), prob=0.7)
+voss70 = ifel(vossModel > threshold70, 0, 1)
+plot(voss70)
+
+# 80% cover
+threshold80 = quantile(as.matrix(vossModel), prob=0.8)
+voss80 = ifel(vossModel > threshold80, 0, 1)
+plot(voss80)
+
+# 90% cover
+threshold90 = quantile(as.matrix(vossModel), prob=0.9)
+voss90 = ifel(vossModel > threshold90, 0, 1)
+plot(voss90)
+
+```
+
+The first pattern I notice is the obvious pattern, as the probability of 1 (let's call it forest) goes up the proportion of the plot filled by one increases. As forest increases in the plot it appears to "grow" from existing plots of forest and do not appear at random points on the plot. Additionally, there are certain places within the plot that the forest grows around and do not fill in until all of the surrounding area is filled.  
+
+**Identify 3 class-level or landscape-level metrics that help you capture the changes you are observing. Calculate those metrics for each of the 9 landscapes and plot them (x-axis is threshold value and y-axis is calculated metric). Briefly describe why you chose these 3 metrics and how they change with increasing cover.**
+
+```{r}
+#10%
+#number of patches at 10%
+numbpatch10 = lsm_c_np(voss10, directions=8)
+numbpatch10
+#mean patch size at 10%
+meanpatchsize10 = lsm_c_area_mn(voss10, direction =8)
+meanpatchsize10
+#Nearest neighbor distance at 10%
+NND10 = lsm_c_enn_mn(voss10, direction = 8)
+NND10
+
+#20%
+#number of patches at 20%
+numbpatch20 = lsm_c_np(voss20, directions=8)
+numbpatch20
+#mean patch size at 20%
+meanpatchsize20 = lsm_c_area_mn(voss20, direction =8)
+meanpatchsize20
+#Nearest neighbor distance at 20%
+NND20 = lsm_c_enn_mn(voss20, direction = 8)
+NND20
+
+#30%
+#number of patches at 30%
+numbpatch30 = lsm_c_np(voss30, directions=8)
+numbpatch30
+#mean patch size at 30%
+meanpatchsize30 = lsm_c_area_mn(voss30, direction =8)
+meanpatchsize30
+#Nearest neighbor distance at 30%
+NND30 = lsm_c_enn_mn(voss30, direction = 8)
+NND30
+
+#40%
+#number of patches at 40%
+numbpatch40 = lsm_c_np(voss40, directions=8)
+numbpatch40
+#mean patch size at 40%
+meanpatchsize40 = lsm_c_area_mn(voss40, direction =8)
+meanpatchsize40
+#Nearest neighbor distance at 40%
+NND40 = lsm_c_enn_mn(voss40, direction = 8)
+NND40
+
+#50%
+#number of patches at 50%
+numbpatch50 = lsm_c_np(voss50, directions=8)
+numbpatch50
+#mean patch size at 50%
+meanpatchsize50 = lsm_c_area_mn(voss50, direction =8)
+meanpatchsize50
+#Nearest neighbor distance at 50%
+NND50 = lsm_c_enn_mn(voss50, direction = 8)
+NND50
+
+#60%
+#number of patches at 60%
+numbpatch60 = lsm_c_np(voss60, directions=8)
+numbpatch60
+#mean patch size at 60%
+meanpatchsize60 = lsm_c_area_mn(voss60, direction =8)
+meanpatchsize60
+#Nearest neighbor distance at 60%
+NND60 = lsm_c_enn_mn(voss60, direction = 8)
+NND60
+
+#70%
+#number of patches at 70%
+numbpatch70 = lsm_c_np(voss70, directions=8)
+numbpatch70
+#mean patch size at 70%
+meanpatchsize70 = lsm_c_area_mn(voss70, direction =8)
+meanpatchsize70
+#Nearest neighbor distance at 70%
+NND70 = lsm_c_enn_mn(voss70, direction = 8)
+NND70
+
+#80%
+#number of patches at 80%
+numbpatch80 = lsm_c_np(voss80, directions=8)
+numbpatch80
+#mean patch size at 80%
+meanpatchsize80 = lsm_c_area_mn(voss80, direction =8)
+meanpatchsize80
+#Nearest neighbor distance at 80%
+NND80 = lsm_c_enn_mn(voss80, direction = 8)
+NND80
+
+#90%
+#number of patches at 90%
+numbpatch90 = lsm_c_np(voss90, directions=8)
+numbpatch90
+#mean patch size at 90%
+meanpatchsize90 = lsm_c_area_mn(voss90, direction =8)
+meanpatchsize90
+#Nearest neighbor distance at 90%
+NND90 = lsm_c_enn_mn(voss90, direction = 8)
+NND90
+
+threshold <- c('10', '20', '30', '40', '50', '60', '70', '80', '90')
+numbpatch <- c('63', '71', '109', '104', '56', '58', '36', '47', '13')
+meanpatchsize <-c('0.002642857', '0.004688732', '0.004580734', '0.006400962', '0.01485893', '0.017215517', '0.03235833', '0.028325532', '0.115207692')
+NND <- c('3.199507', '3.637775', '2.939403', '2.540016', '2.535572', '2.687083', '2.663815', '2.413240', '2.244642')
+
+plot(threshold, numbpatch)
+plot(threshold, meanpatchsize)
+plot(threshold, NND)
+
+```
+
+I chose number of patches and mean patch area to represent how the existing patches were growing as the threshold increased. Mean patch area grew consistently larger even as the number of patches increased indicating that even though the number of patches were increasing the size of the existing patches were growing. Eventually (at a threshold of 50%) the number of patches sharply decreased as the patches connected to each other (growing around certain areas) and mean patch area rapidly grew. The third metric I chose was euclidean nearest neighbor distance to show how as the patches grew closer together the distance between those patches of the same class also got smaller. Even though this metric did not consistently decrease, euclidean nearest neighbor distance decreased rapidly until a threshold of about 40-50% when most larger patches were connected. This shows that distance between patches got smaller until most of them were connected.    
+
+## Challenge 5 (4 points)
+
+**Use the voss2d() function to simulate 9 surfaces. In each one, g should be 7, but vary the value of H from 0.1 to 0.9. Create a unique landscape from each of these with a threshold value of 30% cover. Again, the 1 values can represent anything you desire, and again I suggest you set the seed for your simulation value so that you get the same outcome each time you run the code. Plot these landscapes and comment on what patterns you see changing as the H value increases from 0.1 to 0.9.**
+
+```{r}
+set.seed(23)
+
+#H=0.1
+vossModel0.1 = voss2d(g=7, H=0.1)
+vossModel0.1 = rast(vossModel0.1$z)
+H0.1 = quantile(as.matrix(vossModel0.1), prob=0.3)
+H0.1 = ifel(vossModel0.1 > H0.1, 0, 1)
+plot(H0.1)
+
+#H=0.2
+vossModel0.2 = voss2d(g=7, H=0.2)
+vossModel0.2= rast(vossModel0.2$z)
+H0.2 = quantile(as.matrix(vossModel0.2), prob=0.3)
+H0.2 = ifel(vossModel0.2 > H0.2, 0, 1)
+plot(H0.2)
+
+#H=0.3
+vossModel0.3 = voss2d(g=7, H=0.3)
+vossModel0.3 = rast(vossModel0.3$z)
+H0.3 = quantile(as.matrix(vossModel0.3), prob=0.3)
+H0.3 = ifel(vossModel0.3 > H0.3, 0, 1)
+plot(H0.3)
+
+#H=0.4
+vossModel0.4 = voss2d(g=7, H=0.4)
+vossModel0.4 = rast(vossModel0.4$z)
+H0.4 = quantile(as.matrix(vossModel0.4), prob=0.3)
+H0.4 = ifel(vossModel0.4 > H0.4, 0, 1)
+plot(H0.4)
+
+#H=0.5
+vossModel0.5 = voss2d(g=7, H=0.5)
+vossModel0.5 = rast(vossModel0.5$z)
+H0.5 = quantile(as.matrix(vossModel0.5), prob=0.3)
+H0.5 = ifel(vossModel0.5 > H0.5, 0, 1)
+plot(H0.5)
+
+#H=0.6
+vossModel0.6 = voss2d(g=7, H=0.6)
+vossModel0.6 = rast(vossModel0.6$z)
+H0.6 = quantile(as.matrix(vossModel0.6), prob=0.3)
+H0.6 = ifel(vossModel0.6 > H0.6, 0, 1)
+plot(H0.6)
+
+#H=0.7
+vossModel0.7 = voss2d(g=7, H=0.7)
+vossModel0.7 = rast(vossModel0.7$z)
+H0.7 = quantile(as.matrix(vossModel0.7), prob=0.3)
+H0.7 = ifel(vossModel0.7 > H0.7, 0, 1)
+plot(H0.7)
+
+#H=0.8
+vossModel0.8 = voss2d(g=7, H=0.8)
+vossModel0.8 = rast(vossModel0.8$z)
+H0.8 = quantile(as.matrix(vossModel0.8), prob=0.3)
+H0.8 = ifel(vossModel0.8 > H0.8, 0, 1)
+plot(H0.8)
+
+#H=0.9
+vossModel0.9 = voss2d(g=7, H=0.9)
+vossModel0.9 = rast(vossModel0.9$z)
+H0.9 = quantile(as.matrix(vossModel0.9), prob=0.3)
+H0.9 = ifel(vossModel0.9 > H0.9, 0, 1)
+plot(H0.9)
+
+```
+
+As H increased from 0.1 to 0.9 the same portion of the plot is covered, but the forest plots become more clumped together. Also, where the clump occurs moves around the plot.
+
+**Identify 3 class-level or landscape-level metrics that help you capture the changes you are observing. THESE MUST BE DIFFERENT THAN THOSE METRICS YOU USED IN CHALLENGE 2. Calculate those metrics for each of the 9 landscapes and plot them (x-axis is H-value and y-axis is calculated metric). Briefly describe why you chose these 3 metrics and how they change with increasing cover.**
+
+```{r}
+#H0.1
+contigH0.1 = lsm_c_contig_mn(H0.1, direction = 8)
+contigH0.1
+coreareaH0.1 = lsm_c_core_mn(H0.1, directions = 8, edge_depth = 1)
+coreareaH0.1
+largestpatchH0.1 = lsm_c_lpi(H0.1, directions = 8)
+largestpatchH0.1
+
+#H0.2
+contigH0.2 = lsm_c_contig_mn(H0.2, direction = 8)
+contigH0.2
+coreareaH0.2 = lsm_c_core_mn(H0.2, directions = 8, edge_depth = 1)
+coreareaH0.2
+largestpatchH0.2 = lsm_c_lpi(H0.2, directions = 8)
+largestpatchH0.2
+
+#H0.3
+contigH0.3 = lsm_c_contig_mn(H0.3, direction = 8)
+contigH0.3
+coreareaH0.3 = lsm_c_core_mn(H0.3, directions = 8, edge_depth = 1)
+coreareaH0.3
+largestpatchH0.3 = lsm_c_lpi(H0.3, directions = 8)
+largestpatchH0.3
+
+#H0.4
+contigH0.4 = lsm_c_contig_mn(H0.4, direction = 8)
+contigH0.4
+coreareaH0.4 = lsm_c_core_mn(H0.4, directions = 8, edge_depth = 1)
+coreareaH0.4
+largestpatchH0.4 = lsm_c_lpi(H0.4, directions = 8)
+largestpatchH0.4
+
+#H0.5
+contigH0.5 = lsm_c_contig_mn(H0.5, direction = 8)
+contigH0.5
+coreareaH0.5 = lsm_c_core_mn(H0.5, directions = 8, edge_depth = 1)
+coreareaH0.5
+largestpatchH0.5 = lsm_c_lpi(H0.5, directions = 8)
+largestpatchH0.5
+
+#H0.6
+contigH0.6 = lsm_c_contig_mn(H0.6, direction = 8)
+contigH0.6
+coreareaH0.6 = lsm_c_core_mn(H0.6, directions = 8, edge_depth = 1)
+coreareaH0.6
+largestpatchH0.6 = lsm_c_lpi(H0.6, directions = 8)
+largestpatchH0.6
+
+#H0.7
+contigH0.7 = lsm_c_contig_mn(H0.7, direction = 8)
+contigH0.7
+coreareaH0.7 = lsm_c_core_mn(H0.7, directions = 8, edge_depth = 1)
+coreareaH0.7
+largestpatchH0.7 = lsm_c_lpi(H0.7, directions = 8)
+largestpatchH0.7
+
+#H0.8
+contigH0.8 = lsm_c_contig_mn(H0.8, direction = 8)
+contigH0.8
+coreareaH0.8 = lsm_c_core_mn(H0.8, directions = 8, edge_depth = 1)
+coreareaH0.8
+largestpatchH0.8 = lsm_c_lpi(H0.8, directions = 8)
+largestpatchH0.8
+
+#H0.9
+contigH0.9 = lsm_c_contig_mn(H0.9, direction = 8)
+contigH0.9
+coreareaH0.9 = lsm_c_core_mn(H0.9, directions = 8, edge_depth = 1)
+coreareaH0.9
+largestpatchH0.9 = lsm_c_lpi(H0.9, directions = 8)
+largestpatchH0.9
+
+H = c('0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9')
+contig = c('0.1275000', '0.1158003', '0.1292007', '0.1669777', '0.1851680', '0.1641820', '0.09541943', '0.1763564', '0.2110088')
+core = c('0.0005819549', '0.001413174', '0.003918391', '0.002278512', '0.003152632', '0.004338889', '0.01936818', '0.02685000', '0.06191429')
+patch = c('9.392464', '24.83024', '21.66937', '13.61096', '13.62899', '13.45472', '29.81792', '29.70975', '29.93810')
+
+plot(H, contig)
+plot(H, core)
+plot(H, patch)
+
+```
+To show how the forest plots became more clumped together I selected to measure contiguity index (measure of the connectedness of the forest plots), core area, and largest patch index. I chose core area and largest patch index because they both measure the size of patches, core area measured the amount of forest that are inside of the edge by at least one "block", whereas the largest patch index measures how big the largest patch is. I chose contiguity index because how connected the plot is is directly reflects the clumped pattern I observed in the first part of this challenge question. Both contiguity index and core area increased as H increased supporting the pattern I saw in the first part of this challenge question. Largest patch area also generally increased, except for an H of 0.4, 0.5, and 0.6. this could be due to the fact the forest plots for these three values were more concentrated around the edge of the plot and the forest plots were not as large even though they were all concentrated along the edge of the plot.     
+
