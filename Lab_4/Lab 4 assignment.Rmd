@@ -82,6 +82,7 @@ PerformanceAnalytics::chart.Correlation(patchmatrix, histogram=F)
 
 Most patch metrics calculated are positively correlated to each other. There are a few metrics (elucidation nearest neighbor and perimeter to area ratio) that are negatively correlated to the other metrics, although they are positively correlated to each other. since most correlations were in the same direction and most of the correlation coefficients were fairly high (r > 0.6), redundancy is high in the patch metrics calculated. Elucidation nearest neighbor was the most unique metric and had relatively low correlation with all the other metrics (r < 0.54). The redundancy among metrics shows that calculating all of the metrics is not likely necessary and choosing a few metrics of interest is likely adequate for making conclusions.   
 
+$\color{red}{\text{Great! +4}}$
 
 ## Challenge 2 (4 points)
 
@@ -126,6 +127,7 @@ totaledgeR
 
 In general there are fewer patches of a larger size generated using the queen rule to generate patches as opposed to using the rook rule. Additionally, patches generated using the queen rule have a larger standard deviation in area, and are farther apart from one another than patches calculated using the rook approach. Total edge area is the same for both rook and queen rules. Using the queen approach may be more appropriate when considering species that do not need interior/core habitat because they will be able to move from patch to patch more easily if patches are only touching at corners than a species that needs more interior/core habitat. Species that needs more internal/core habitat likely will not spend a lot of time at the edge of habitat patches and therefore will likely not move to another area if only the corners of the patch are touching, therefore the two patches should be analyzed separately. It is not likely the species would move between single blocks in the rook approach either, but using the rook approach would at least reduce the amount of patches only connected by a small area (i.e. a corner).         
 
+$\color{red}{\text{Nice! +4}}$
 
 ## Challenge 3 (4 points)
 
@@ -232,7 +234,7 @@ sei19
 
 The 2019 landcover raster has a higher Shannon Diversity Index than the 2001 raster. This is likely because the 2001 raster is mostly made up of forest and agriculture land types, but in 2019 when more of the forest land type is removed there is more barren and grassland cover adding to the diversity of the plot of land. Similarly, Shannon's Evenness Index has a lower value for 2001 compared to 2019. This makes sense as the majority of the 2001 plot is made up primarily by only two dominant land types whereas the 2019 plot has more landcover types in similar proportions that make up the raster.      
 
-
+$\color{red}{\text{Yes! +4}}$
 
 ## Challenge 4 (4 points)
 
@@ -410,6 +412,8 @@ plot(threshold, NND)
 
 I chose number of patches and mean patch area to represent how the existing patches were growing as the threshold increased. Mean patch area grew consistently larger even as the number of patches increased indicating that even though the number of patches were increasing the size of the existing patches were growing. Eventually (at a threshold of 50%) the number of patches sharply decreased as the patches connected to each other (growing around certain areas) and mean patch area rapidly grew. The third metric I chose was euclidean nearest neighbor distance to show how as the patches grew closer together the distance between those patches of the same class also got smaller. Even though this metric did not consistently decrease, euclidean nearest neighbor distance decreased rapidly until a threshold of about 40-50% when most larger patches were connected. This shows that distance between patches got smaller until most of them were connected.    
 
+$\color{red}{\text{You're on a roll! +4}}$
+
 ## Challenge 5 (4 points)
 
 **Use the voss2d() function to simulate 9 surfaces. In each one, g should be 7, but vary the value of H from 0.1 to 0.9. Create a unique landscape from each of these with a threshold value of 30% cover. Again, the 1 values can represent anything you desire, and again I suggest you set the seed for your simulation value so that you get the same outcome each time you run the code. Plot these landscapes and comment on what patterns you see changing as the H value increases from 0.1 to 0.9.**
@@ -571,3 +575,4 @@ plot(H, patch)
 ```
 To show how the forest plots became more clumped together I selected to measure contiguity index (measure of the connectedness of the forest plots), core area, and largest patch index. I chose core area and largest patch index because they both measure the size of patches, core area measured the amount of forest that are inside of the edge by at least one "block", whereas the largest patch index measures how big the largest patch is. I chose contiguity index because how connected the plot is is directly reflects the clumped pattern I observed in the first part of this challenge question. Both contiguity index and core area increased as H increased supporting the pattern I saw in the first part of this challenge question. Largest patch area also generally increased, except for an H of 0.4, 0.5, and 0.6. this could be due to the fact the forest plots for these three values were more concentrated around the edge of the plot and the forest plots were not as large even though they were all concentrated along the edge of the plot.     
 
+$\color{red}{\text{Amazing work, Justin!}}$
