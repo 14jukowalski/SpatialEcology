@@ -1,0 +1,150 @@
+---
+title: "Lab 5 assignment - Point pattern analysis"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r}
+rm(list=ls())
+
+require(spatstat)
+require(tidyverse)
+require(terra)
+```
+
+
+# Challenge 1 (3 points)
+
+Create a simulation window on a landscape stretching from 0 to 100 units in both the x and y directions. Now simulate the distribution of an organism on this landscape using a Poisson process with a lambda value of 0.01. Plot this organism's distribution. How many organisms are there on your landscape? What is the expected number of organisms that you should find on this landscape based on your simulation parameters? Why?
+
+```{r}
+set.seed(6)
+simPp = rpoispp(lambda = 0.01, win= owin(xrange = c(0,100), yrange = c(0,100)))
+plot(simPp)
+
+simPp
+
+```
+
+There are 102 organisms on the simulated landscape. The expected number of organisms given the parameters is 100 because lambda is the number of points per unit area and the simulated plot was 100 x 100 units (100 x 100 x 0.01 = 100). The total number of points in the simulation is random which is why there were 102 organisms not 100.
+
+# Challenge 2 (3 points)
+
+Verify that there no linear or quadratic pattern in the distribution of your organisms using fitted Poisson process models. Show the outcome of this analysis and explain your conclusion.
+
+```{r}
+ppInt = ppm(simPp, ~1)
+ppXy = ppm(simPp, ~ x + y)
+ppXy2 = ppm(simPp, ~polynom (x, y, 2))
+
+data.frame(model = c('int', 'xy', 'xy2'),
+           AIC = c(AIC(ppInt), AIC(ppXy), AIC(ppXy2)))
+
+plot(predict(ppXy2, type='trend'))
+plot(simPp, add=T)
+
+plot(predict(ppXy, type='trend'))
+plot(simPp, add=T)
+```
+
+The model that assumed homogeneous distribution (int) of the points was a better model than the linear (xy) or quadratic models (xy2). However, even though the homogeneous distribution model was the best model it does appear that there is a slight quadratic (horseshoe) pattern with points more concentrated on the top, bottom, and right side of the plot. The same can be said for linear trends with points being more likely to occur on the right and less likely to occur on the left. But, with that being said the values for both the quadratic and linear patterns are small suggesting that even though the patterns might exist, they are not very significant.   
+
+# Challenge 3 (14 points)
+
+I have simulated the distributions of 2 critters and provided their x-y coordinates. One of them is a non-territorial predator. The second is a critter that is preyed upon by the predator and exhibits a fear response to the predator's presence. Use the tools you learned in the lab to explore the distributions of these two critters. Identify which one is the predator and which is the prey, and provide code and a thorough justification supporting your conclusion.
+
+
+```{r}
+#Use this code chunk to get you started.
+
+predPreyWin = owin(xrange = c(0, 100), yrange = c(0, 100))
+
+critter1 = read.csv('https://raw.githubusercontent.com/ValenteJJ/SpatialEcology/main/Week5/species1.csv') %>% 
+  mutate(org = 'critter1')
+
+critter2 = read.csv('https://raw.githubusercontent.com/ValenteJJ/SpatialEcology/main/Week5/species2.csv') %>% 
+  mutate(org = 'critter2')
+
+#Create a ppp file for each species
+pppcritter1 = ppp(x=critter1$x, y=critter1$y, window = predPreyWin)
+pppcritter2 = ppp(x=critter2$x, y=critter2$y, window = predPreyWin)
+```
+
+First, lets look at the summary statistics and visualize the distribution of each critter
+```{r}
+#critter1
+plot(pppcritter1)
+plot(density(pppcritter1, 1))
+summary(pppcritter1)
+
+#critter2
+plot(pppcritter2)
+plot(density(pppcritter2, 1))
+summary(pppcritter2)
+```
+Critter 1 is slightly more abundant that critter 2, which could be used as evidence that species 1 is the prey species. Critter 1 appears to be located in the top and bottom left of the plot, where species two appears to be located more in the middle of the plot. 
+Next, lets look at clustering of each critter by overlaying a grid onto the plot and running a chi-square test to determine if the critters are distributed randomly. The prey species may be clustered together as they avoid the predator species.
+
+```{r}
+#critter 1
+q = quadratcount(pppcritter1, nx=4, ny=4)
+plot(pppcritter1)
+plot(q, add=T)
+quadrat.test(pppcritter1, nx=4, ny=4, method='Chisq')
+
+#critter 2
+q = quadratcount(pppcritter2, nx=4, ny=4)
+plot(pppcritter2)
+plot(q, add=T)
+quadrat.test(pppcritter2, nx=4, ny=4, method='Chisq')
+```
+Placing a grid over the plot of critter one confirmed that more individuals were located in the top left and bottom left of the plot compared to other areas, and the chi-square test was statistically significant (X2 = 28.89, p = 0.033) indicating that critter 1 is not distributed randomly over the plot. However, the chi-square test for critter 2 two was not statistically significant (X2 = 22.407, p=0.20). Based on this evidence, species one appears to be the prey. 
+To further examine grouping of critters around each other, let's calculate Ripley's L with a isotropic correction since critter one is located in the corners of the plot near edges. For consistency I used an isotropic correction for critter 2 as well. I will also look to see if the values are different than random. 
+```{r}
+#critter 1 
+lcritter1csr = envelope(pppcritter1, Lest, nsim=99, rank=1, correction='isotropic', global=F)
+plot(lcritter1csr, .-r~r, shade=c('hi', 'lo'), legend=F)
+
+#critter 2 
+lcritter2csr = envelope(pppcritter2, Lest, nsim=99, rank=1, correction='isotropic', global=F)
+plot(lcritter2csr, .-r~r, shade=c('hi', 'lo'), legend=F)
+```
+We see that for critter one the black line is above the shaded (random) area further indicating that there is clustering of this critter. For critter two the black line is not different than random. For determining which species is the predator and which is the prey I am not too concerned about at what distances the clumping is occurring so I am not going to calculate a pair correlation to analyze that, but calculating nearest neighbor distance will further confirm that there is clumping in critter one and not critter two.
+```{r}
+#critter 1
+gEnvcritter1 = envelope(pppcritter1, Gest, nsim=99, rank=1, correction='rs', global=F)
+plot(gEnvcritter1, shade=c('hi', 'lo'), legend=F)
+
+#critter2
+gEnvcritter2 = envelope(pppcritter2, Gest, nsim=99, rank=1, correction='rs', global=F)
+plot(gEnvcritter2, shade=c('hi', 'lo'), legend=F)
+```
+Nearest neighbor distance was not different than random for either critter one or two. But, as Ripley's L and the chi-square analysis of a grid over the plot provided evidence that critter one was clumped, critter one may be grouped closer together while avoiding critter two. Critter two did not show any evidence in clumping and was generally randomly distributed over the landscape. 
+
+Finally, let's see if the distribution of critter one is random when considering the presence of critter two.  
+
+```{r}
+c1c2 = rbind(critter1, critter2)
+c1c2$org = as.factor(c1c2$org)
+pppc1c2 = ppp(x=c1c2$x, y=c1c2$y, window = predPreyWin, marks = c1c2$org)
+
+#distance of critter 2 from critter 1
+lMultic1c2 = envelope(pppc1c2, Lcross, nsim=99, rank=1, global=F, i='critter1', j= 'critter2', simulate = expression(rlabel(pppc1c2)))
+plot(lMultic1c2, .-r~r, legend=F)
+
+#how far critter 1 is from other critter 1 individuals
+lMultic1c2a = envelope(pppc1c2, Lcross, nsim=99, rank=1, global=F, i='critter1', j= 'critter1', simulate = expression(rlabel(pppc1c2)))
+plot(lMultic1c2a, .-r~r, legend=F)
+
+#how for critter 2 is from other critter 2 individuals
+lMultic1c2b = envelope(pppc1c2, Lcross, nsim=99, rank=1, global=F, i='critter2', j= 'critter2', simulate = expression(rlabel(pppc1c2)))
+plot(lMultic1c2b, .-r~r, legend=F)
+
+#how far critter 1 is from critter 2
+lMultic1c2c = envelope(pppc1c2, Lcross, nsim=99, rank=1, global=F, i='critter2', j= 'critter1', simulate = expression(rlabel(pppc1c2)))
+plot(lMultic1c2c, .-r~r, legend=F)
+```
+Both critter 1 and 2 are farther away from each other (less grouping) than would be expected if they were randomly distributed around each other. this analysis also confirmed that species 1 is closer together (clumped) than would be expected if the individuals were randomly distributed around each other. Finally, critter two is not distributed differently from what would be expected based on random distribution relative to each individual. 
+
+Based on the evidence I have gathered from analyzing the distributions of critter one and critter two, I believe that critter one is the prey and critter two is the predator. I believe this because critter one is more abundant, not evenly distributed in the plot, and is farther from critter two than expected but closer to each other than expected. The fact that critter one is grouped together and not randomly spread out in the landscape could be due to the fact that critter one is avoiding critter two and aggregating together near areas of cover, whereas critter two is more evenly distributed on the landscape as they are searching for critter 1.   
