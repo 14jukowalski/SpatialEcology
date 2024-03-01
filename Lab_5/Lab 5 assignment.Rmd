@@ -29,6 +29,9 @@ simPp
 
 There are 102 organisms on the simulated landscape. The expected number of organisms given the parameters is 100 because lambda is the number of points per unit area and the simulated plot was 100 x 100 units (100 x 100 x 0.01 = 100). The total number of points in the simulation is random which is why there were 102 organisms not 100.
 
+$\color{red}{\text{Perfect. +3}}$
+
+
 # Challenge 2 (3 points)
 
 Verify that there no linear or quadratic pattern in the distribution of your organisms using fitted Poisson process models. Show the outcome of this analysis and explain your conclusion.
@@ -49,6 +52,9 @@ plot(simPp, add=T)
 ```
 
 The model that assumed homogeneous distribution (int) of the points was a better model than the linear (xy) or quadratic models (xy2). However, even though the homogeneous distribution model was the best model it does appear that there is a slight quadratic (horseshoe) pattern with points more concentrated on the top, bottom, and right side of the plot. The same can be said for linear trends with points being more likely to occur on the right and less likely to occur on the left. But, with that being said the values for both the quadratic and linear patterns are small suggesting that even though the patterns might exist, they are not very significant.   
+
+$\color{red}{\text{Perfect. +3}}$
+
 
 # Challenge 3 (14 points)
 
@@ -148,3 +154,6 @@ plot(lMultic1c2c, .-r~r, legend=F)
 Both critter 1 and 2 are farther away from each other (less grouping) than would be expected if they were randomly distributed around each other. this analysis also confirmed that species 1 is closer together (clumped) than would be expected if the individuals were randomly distributed around each other. Finally, critter two is not distributed differently from what would be expected based on random distribution relative to each individual. 
 
 Based on the evidence I have gathered from analyzing the distributions of critter one and critter two, I believe that critter one is the prey and critter two is the predator. I believe this because critter one is more abundant, not evenly distributed in the plot, and is farther from critter two than expected but closer to each other than expected. The fact that critter one is grouped together and not randomly spread out in the landscape could be due to the fact that critter one is avoiding critter two and aggregating together near areas of cover, whereas critter two is more evenly distributed on the landscape as they are searching for critter 1.   
+
+
+$\color{red}{\text{Outstanding work. +14}}$
