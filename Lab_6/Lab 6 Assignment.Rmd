@@ -33,6 +33,9 @@ ggplot(Bees, aes(x=x, y=y, color=meanBee))+
 
 Based on plotting bee abundance as a function of x and y coordinates it appears that there is spatial dependence with higher bee abundance (red) in the middle of the plot and lower bee abundance (blue and purple) located in the top and bottom of the plot especially in the in the top right and bottom left corners.
 
+$\color{red}{\text{Nice. +2}}$
+
+
 # Challenge 2 (3 points)
 
 Empirically test for evidence of spatial dependence in bee abundance by first building a correlogram, then building a semi-variogram. Be sure to provide an envelope for assessing whether the values in each figure are statistically different from what would be expected if the bee values were randomly distributed. Describe the patterns you see, and your interpretation with regards to the spatial dependence in mean bee abundance. Be sure to identify the maximum distance at which you should interpret your figures (2/3 of the maximum distance between points).
@@ -75,6 +78,9 @@ plot(empbees, envelope=empEnvbees)
 ```
 
 Based on the corelogram there appears to be positive spatial autocorrelation until about 22 m when the values start to level off. There may be some negative spatial autocorrelation occurring at 30 to 50 m and 75 - 90 m due to significant values, but this also occurs around the same are the values start to level off. The semi-variogram had similar results with  semivariance being lower (indicating spatial dependence) until about 22 m. Additionally, at distances of about 75 m semivariance is above the envelope of what would be expected if the bees were randomly distributed. Maximum distance at which I interpreted the figures was denoted by a red line in the correlogram and the correlogram was cropped to the same extent.
+
+$\color{red}{\text{Good. +3}}$
+
 
 # Challenge 3 (4 points)
 
@@ -132,6 +138,9 @@ plot(empbeesresid, envelope=empEnvbeesresid)
 
 The values of the model estimated intercept and the average value across all of the sites in the same. The correlogram and variogram are very similar, if not the same for the raw data and the residual data. The only visible differences between the two data sets is the differences in the envelope created by Monte Carlo simulations which are expected to be slightly different each time it is run.  
 
+$\color{red}{\text{Good. +4}}$
+
+
 # Challenge 4 (4 points)
 
 Conventional wisdom indicates that the distribution of floral resources may substantially influence bee abundance. In addition, I am  completely making up the following fact: the average bee has a perceptual range of about 15 m. Below I have provided code for importing a raster that shows the number of flowers counted in 1 m grid cells across the entire study area. Use the focal() function from the previous lab to generate a new raster in which each cell value represents the mean number of flowers in cells within a 15 m radius. Plot the distribution of the blue vane traps over the 15 m focal raster. No text required here, just show me the plot.
@@ -157,6 +166,9 @@ points(trapspoints)
   
 
 ```
+
+$\color{red}{\text{Perfect. +4}}$
+
 
 # Challenge 5 (4 points)
 
@@ -213,8 +225,14 @@ plot(empflowerresid, envelope=empEnvflowerresid)
 
 The values of both the correlogram and the variogram are not different from random distributions.
 
+$\color{red}{\text{Yes. +4}}$
+
+
 # Challenge 6 (3 points)
 
 What is your assessment regarding the distribution of bee abundance in this study area? Does it exhibit spatial dependence, and if so, what is driving that pattern?
 
 The distribution of bee abundance does exhibit spatial dependence based on the evidence from the variorgams and correlograms in challenge questions 2 and 3 where values of the figures were outside of random distributions. But, when a model was fit that accounts for the distribution of flowers in the study area, the residuals of that model are not different from random distributions. Therefore, flower distributions in the study area are driving the patterns in bee abundance. Bees are randomly distributed within the flower patches, but the flower patches are not randomly distributed in the study area so when analyzed separately it appears as if the bees are not randomly distributed in the study area because of their dependence on flowers. 
+
+$\color{red}{\text{Awesome work, Justin! +3}}$
+
