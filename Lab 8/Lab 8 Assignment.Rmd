@@ -120,6 +120,8 @@ plot(rfMap)
 ```
 One similarity that I notice among the three models is that the highest probability of finding varied thrush generally occurred in the same areas, the probability of finding a varied thrush is highest in the left part of the study area. The main difference I notice is that the the GLM model has the most area of the figure with higher probability of finding varied thrush (green) with the random forest model having the least green, and the envelope model being in the middle. Each model calculated the probability of finding varied thrush in a different way and each model has different pros and cons. For example, envelope models give equal weight to all covariates and is calculated using percentiles of covariates based on where detection occur, but random forest models uses many decision trees by bootstrapping the data where the number of explanatory variables in each tree can be specified and then decisions are made by which conclusion was agreed upon by the most trees. Understanding how each model reaches conclusions and the pros and cons of each model is important when deciding which model fits best for your data because you will get different results based on which model you select.    
 
+$\color{red}{\text{Nice. +4}}$
+
 # Challenge 2 (4 points)
 
 When we fit our GLM in lab, we used background points, rather than true absence points, to represent pseudo-absences. Fit the exact same GLM model, only this time use presence and true absence data. That is, replace the background rows in the dataframe with rows that represent actual sites where surveys were completed but Varied Thrush were not detected. Once you've fit the GLM, build a new SDM from this fitted model and visually compare the prediction surface to that built based on the presence-background model. What discrepancies do you notice, and what is your intuition regarding which of these two models is more reliable?
@@ -151,6 +153,8 @@ plot(glmMap2)
 plot(glmMap)
 ```
 The main discrepancy between the two models is that the model where the absence data is included is that there is more contrast between the areas where varied thrush are more likely to be found and the areas where they are less likely to be found, meaning that the are more dark green and light salmon areas in the model with the absence data than in the model with the background points. My intuition tells me that the model with the absence points is more accurate than the model with the background points because the background points were randomly selected and do not represent any sampling where as the absence data represents actual sampling locations where varied thrush were not found.
+
+$\color{red}{\text{Also, there is a big difference in the scale due to the number of background points used in the presence-background model. +3.5}}$
 
 # Challenge 3 (4 points)
 
@@ -218,6 +222,8 @@ ggplot(tmp, aes(x=xValue, y=value, color=name))+
 ```
 The model with absence data consistently has higher values for all of the covariates than the model with just the background data. Since predicted occurrence is higher for covariates in the model with the absence points, it makes sense that the plot of the model with the absence data has more areas where varied thrush have a high probability of occupancy compared to the plot with the random background points.   
 
+$\color{red}{\text{Good. +4}}$
+
 # Challenge 4 (4 points)
 
 Varied Thrush are considered forest-dependent, and thus one might characterize mesic forests as "habitat" for the species. Calculate the total amount of mesic forest in the study area, and the mean size of the mesic forest patches.
@@ -241,7 +247,10 @@ plot(rfMap2)
 lsm_c_ca(rfMap2)
 lsm_c_area_mn(rfMap2, directions=8)
 ```
-I chose a threshold value of 0.25 because I wanted to be able to visualize the patches and using a threshold of 0.5 had very few patches so I chose 0.25 for this exercise. In practice a threshold value could be used when you want to include as much area where varied thrush could be found as possible, but it would not be a very practical threshold in most situations. The total amount of habitat and the patch size of habitat is much larger for the mesic forest approach than for the SDM-based approach. You may rely on the mesic forest approach if you do not have the resources to sample for the species and create a SDM or if you are just looking for a general area where the specie may be located, for example selecting sample sites to collect varied thrush when little data exists suggesting where they might be located. You may rely on the SDM-based approach if you are interested in showing where the varied thrush has the highest probability may be located, for example if trying to create management areas or areas to protect the varied thrush. 
+I chose a threshold value of 0.25 because I wanted to be able to visualize the patches and using a threshold of 0.5 had very few patches so I chose 0.25 for this exercise. In practice a threshold value could be used when you want to include as much area where varied thrush could be found as possible, but it would not be a very practical threshold in most situations. The total amount of habitat and the patch size of habitat is much larger for the mesic forest approach than for the SDM-based approach. You may rely on the mesic forest approach if you do not have the resources to sample for the species and create a SDM or if you are just looking for a general area where the species may be located, for example selecting sample sites to collect varied thrush when little data exists suggesting where they might be located. You may rely on the SDM-based approach if you are interested in showing where the varied thrush has the highest probability may be located, for example if trying to create management areas or areas to protect the varied thrush. 
+
+$\color{red}{\text{Nice. +4}}$
+
 # Challenge 5 (4 points)
 
 When we fit the Maxent model in the lab, we used a regularization constant of 1. Fit the model two more times, using regularization (regmult) constants of 0.5 and 3. Construct figures showing the relationship between the 4 explanatory variables and the predicted outcome from these 3 fitted Maxent models. What is the regularization constant doing? Hint: you may need to Google it.
@@ -359,3 +368,5 @@ ggplot(tmp, aes(x=xValue, y=value, color=name))+
 
 ```
 The regularization constant specifies how closely fit the model output is to the original data. A value smaller than 1 will be a closer fit to the original data but could result in over fitting of the data. A  value larger than 1 will result in more a spread out plot from the original data but could be too spread out and not represent the data sufficiently. 
+
+$\color{red}{\text{Awesome. +4}}$
