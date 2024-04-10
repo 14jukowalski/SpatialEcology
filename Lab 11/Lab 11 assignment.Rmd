@@ -1,0 +1,278 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# Re-running code from lab as a starting point
+
+```{r, warning=F}
+require(terra)
+require(tidyterra)
+require(sf)
+require(adehabitatHR)
+require(adehabitatLT)
+require(adehabitatHS)
+require(tidyverse)
+require(survival)
+
+
+#Import landcover tif
+land = rast('https://github.com/ValenteJJ/SpatialEcology/raw/main/Week10/panther_landcover.tif')
+
+#Reclassify the landcover tif
+classification = read.table('https://raw.githubusercontent.com/ValenteJJ/SpatialEcology/main/Week10/landcover%20reclass.txt', header=T) 
+land = classify(land, classification[,c(1,3)])
+land = categories(land, value=unique(classification[,c(3,4)]))
+
+
+#Import panther locations
+panthers = st_read('/vsicurl/https://github.com/ValenteJJ/SpatialEcology/raw/main/Week10/panthers.shp') %>% 
+  mutate(CatID = as.factor(CatID))
+
+#Calculate wet forest focal statistic (5 km radius)
+wetForest = land
+values(wetForest) = 0
+wetForest[land %in% c(10,12)] = 1
+probMatrix = focalMat(wetForest, 5000, type='circle', fillNA=FALSE)
+wetFocal = focal(wetForest, probMatrix, fun='sum', na.rm=T)
+
+
+#Calculate dry forest focal statistic (5 km radius)
+dryForest = land
+values(dryForest) = 0
+dryForest[land %in% c(11, 13)] = 1
+probMatrix = focalMat(dryForest, 5000, type='circle', fillNA=FALSE)
+dryFocal = focal(dryForest, probMatrix, fun='sum', na.rm=T)
+
+#Stack together 
+layers = c(land, wetFocal, dryFocal)
+names(layers) = c('landcover', 'wetForest', 'dryForest')
+
+#Recreate our used points object
+use = terra::extract(layers, panthers) %>% 
+  data.frame() %>% 
+  mutate(CatID = as.factor(panthers$CatID)) %>% 
+  group_by(CatID, landcover) %>%
+  summarise(n = n()) %>% 
+  ungroup() %>% 
+  arrange(landcover) %>% 
+  pivot_wider(names_from = landcover, values_from = n, values_fill=0) %>% 
+  data.frame()
+row.names(use) = use$CatID
+use$CatID = NULL
+
+#Recreate our available points object for a type II design
+set.seed(8)
+randII = spatSample(land, size=1000, as.points=T)
+randIILand = data.frame(randII)
+
+availII = randIILand %>% 
+  group_by(Description2) %>% 
+  summarise(n = n()) %>% 
+  ungroup() %>% 
+  rename(landcover = Description2) %>% 
+  filter(!(is.na(landcover) | landcover=='Exotics')) %>% 
+  pivot_wider(names_from = landcover, values_from = n)
+```
+
+
+# Challenge 1 (5 points)
+
+In the lab, we estimated Manly's statistic (wi) values for a type II study design. We also fit a logistic regression for a type II study design. For this challenge, you're going to explore the relationship between wi values and beta values from a logistic regression model. Below I have recreated the analysis for producing wi values. I've also reconstructed the dataset we used for fitting the logistic regression models (allCovs).
+
+Fit a new logistic regression model where use is a function of landcover-1 (the -1 removes the intercept from the fitted model). Make sure this is the only covariate in the model. Exponentiate the coefficients from the fitted model and compare them to the wi values calculated for each landcover type. What do you notice? Explain the similarities and/or differences in how you would interpret the wi values and exponentiated coefficients.
+
+```{r}
+#Recreating the wi analysis
+selRatioII = widesII(u = use, 
+                     a = as.vector(as.matrix(availII)),
+                     avknown = F,
+                     alpha = 0.05)
+
+#Recreating the dataset for logistic regression
+useCovs = terra::extract(layers, panthers) %>% 
+  select(-ID) %>% 
+  mutate(use=1)
+backCovs = terra::extract(layers, randII) %>% 
+  select(-ID) %>% 
+  mutate(use=0)
+allCovs = rbind(useCovs, backCovs) %>% 
+  filter(!(is.na(landcover) | landcover=='Exotics')) %>% 
+  mutate(landcover = as.factor(as.character(landcover)))
+
+#My code to answer the questions
+lrlandcover = glm(use ~ landcover-1, family=binomial(link=logit), data=allCovs)
+summary(lrlandcover)
+#Barren
+exp(0.4520)
+#Coastal Wet
+exp(-1.9253)
+#Cropland
+exp(-1.0546)
+#Cypress Swamp
+exp(1.6094)
+#Dry Prairie
+exp(0.1206)
+#Freshwater Marsh
+exp(-0.2250)
+#Hardwood Swamp
+exp(1.2347)
+#Open Water
+exp(-2.2792)
+#Pasture Grassland
+exp(-0.5408)
+#Pineland
+exp(0.9837)
+#Scrub/Shrub
+exp(0.1484)
+#Upland Forest
+exp(1.0531)
+#Urban
+exp(-2.5649)
+
+print('Wi')
+selRatioII$wi
+
+```
+The Wi and exponetiated values from logistic regression have similar trends in the relationship between use by panthers and land cover type. For example, forest land cover types have a high probability of use based on what is available based on the generalized linear model and was used more than expected based on the abundance of the habitat on the landscape (Wi >1). The differences in how I would interpret the exponentiated values from the Wi values is that exponentiated values would be the probability of panthers using each habitat type based on availability based on the locations where panthers were detected, with probabilities >1 being greater than expected and probabilities <1 being less than expected. I would interpret Wi values as how the panthers used each habitat type based on availability based on the locations of the panthers sampled with values >1 meaning panthers were found in those habitat types more than what would be expected based off of availability and values <1 mean panthers were found in those locations less than what would be expected based off of availability of that habitat type.  
+
+# Challenge 2 (5 points)
+
+In the lab, we used the distribution of step lengths and turning angles to help us devise potential steps each individual could have taken at each point in time. Instead of step lengths, build a histogram representing the distribution of step speeds in km/hr. When and why might you choose to sample from a distribution of step speeds to calculate potential step lengths rather than drawing from the distribution of step lengths itself?
+
+```{r}
+substrRight = function(x, n){
+  substr(x, nchar(x) - n+1, nchar(x))
+}
+
+#Here we're just creating a spatial object from our panthers sf object. Most of the code is dedicated to converting the DOY information to a real date.
+panthersSp = panthers %>% 
+  mutate(Juldate = as.character(Juldate)) %>% 
+  mutate(date = as.numeric(substrRight(Juldate, 3))) %>% 
+  mutate(Date = as.Date(date, origin=as.Date("2006-01-01"))) %>% 
+  mutate(Date = as.POSIXct(Date, "%Y-%m-%d", tz='')) %>% 
+  as('Spatial')
+
+#And this creates a trajectory object from the x-y coordinates and associated timestamps.
+pantherLtraj = as.ltraj(xy=coordinates(panthersSp), date=panthersSp$Date, id=panthersSp$CatID, typeII=T)
+
+plot(pantherLtraj)
+
+trajDf = ld(pantherLtraj)
+
+trajDfdivide = trajDf %>%
+  mutate(dt/3600) %>%
+  mutate(dist/1000)
+
+trajDf_km_hr = trajDfdivide$`dist/1000`/trajDfdivide$`dt/3600`
+print(trajDf_km_hr)
+
+hist(trajDf_km_hr)
+
+
+
+
+```
+You may choose to use step speeds rather than distances if you are interested in how quickly animals move through the landscape rather than how far they move. For example, you could be interested in how quickly an animal moves though a landscape or how much time it may spend moving through habitat patches. In those cases distance moved may not be of interest and step speed would be a better suited for your research questions.    
+
+# Challenge 3 (5 points)
+
+Path straightness is a metric we can use to evaluate how tortuous of a path a tracked animal took from one point to another. We calculate straightness as the straight line distance between two points divided by the length of the path actually taken. The resulting straightness statistic takes a value between 0 and 1 where 1 indicates a straight line path and 0 represents an infinitely tortuous path.
+
+For each of the 6 panthers, calculate the straightness of the path between the first and last point recorded. To do that, first calculate the numerator for each panther as the straight-line distance between the start and end points. HINT: the coordinates for each point are in UTMs (meters from the Equator and meters from the Prime Meridian). With the x and y coordinates for two different points, you can calculate their straight-line distance using the Pythagorean theorem.
+
+Next calculate the denominator for each panther. To do this, you can simply sum all of the step distances for that particular individual.
+
+Now divide the numerator by the denominator. Which panther took the most tortuous path? Which took the least tortuous path?
+
+```{r}
+#panther 1
+sldist1 = sqrt((712916.8-711913.9)^2 + (250378.9-250236.1)^2)
+sldist1
+
+panther1 = (pantherLtraj[[1]][,6])
+panther1 = na.omit(panther1)
+sum(panther1)
+
+panther1strat = 1013.015/818433.3
+panther1strat
+
+#panther 2
+sldist2 = sqrt((655210.3-644599.2)^2 + (339305.0-322008.9)^2)
+sldist2
+
+panther2 = (pantherLtraj[[2]][,6])
+panther2 = na.omit(panther2)
+sum(panther2)
+
+panther2strat = 20291.64/1031366
+panther2strat
+
+#panther 3
+sldist3 = sqrt((661528.9-660779.5)^2 + (254586.1-246952.5)^2)
+sldist3
+
+panther3 = (pantherLtraj[[3]][,6])
+panther3 = na.omit(panther3)
+sum(panther3)
+
+panther3strat = 7670.297/845326.8
+panther3strat
+
+#panther 4
+sldist4 = sqrt((668109.3-666184.9)^2 + (290853.5-292121.2)^2)
+sldist4
+
+panther4 = (pantherLtraj[[4]][,6])
+panther4 = na.omit(panther4)
+sum(panther4)
+
+panther4strat = 2304.426/1012750
+panther4strat
+
+#panther 5
+sldist5 = sqrt((696436.9-668733.3)^2 + (258735.1-262333.2)^2)
+sldist5
+
+panther5 = (pantherLtraj[[5]][,6])
+panther5 = na.omit(panther5)
+sum(panther5)
+
+panther5strat = 27936.28/630222.2
+panther5strat
+
+#panther 6
+sldist6 = sqrt((703739.1-625305.0)^2 + (216222.9-231779.5)^2)
+sldist6
+
+panther6 = (pantherLtraj[[6]][,6])
+panther6 = na.omit(panther6)
+sum(panther6)
+
+panther6strat = 79961.96/511956.2
+panther6strat
+
+```
+Panther 100 took the most tortuous path, and panther 147 took the least tortuous path.  
+
+# Challenge 4 (5 points)
+
+For each panther, calculate the frequency with which locations were recorded as points per day. Plot path straightness as a function of frequency (there should be 6 points on this figure, one per panther). What relationship do you notice between these two variables, and why might that pattern be occurring?
+
+```{r}
+trajDfppd = trajDfdivide %>%
+  mutate(86400/dt)
+
+averageppd = trajDfppd %>%
+  group_by(id) %>%
+  summarize(average = mean(`86400/dt`, na.rm = TRUE))
+
+straightness = c(panther1strat, panther2strat, panther3strat, panther4strat, panther5strat, panther6strat)
+
+straightness
+
+plot(averageppd$average, straightness)
+```
+The relationship in the data shows that more points recorded per day the higher the straightness index, although it is difficult to tell with only six data points. Honestly, this is the opposite of what I would expect, I would expect that more points would mean deviations from the straight line distance would be captured more often leading to increased distance traveled and more points farther away from the straight line path. but I will take a shot at explaining why this may be occurring. If points are taken more often they will more closely resemble the path of the panther. If the points more closely resemble the path of the panther, there will be less distance added to the track that the panther did not travel. 
+Another potential explanation for why Panther 100 took the most tortuous path, and panther 147 took the least tortuous path (although it does not have to do with frequency) is that based on the plots of panther movement panther 147 appears to have the largest distance between start and end points and panther 100 have very little distance between start and end points. As a result, any movement by panther 100 away from its start and end point will have a large effect on the straightness index, where as movements off of the straight line path by panther 147 would be more offset by the fact that the panther moved a farther total distance to its endpoint.         
+
