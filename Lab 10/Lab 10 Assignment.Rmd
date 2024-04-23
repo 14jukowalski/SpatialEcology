@@ -168,6 +168,7 @@ print(finaltable)
 
 No text necessary.
 
+$\color{red}{\text{Good. +4}}$
 
 # Challenge 2 (4 points)
 
@@ -177,7 +178,9 @@ Build a boxplot showing the distribution of home range sizes. Your x-axis should
 boxplot(finaltable$MCP, finaltable$KDE, finaltable$alocoh, finaltable$BB, names = c('MCP', 'KDE', 'alocoh', 'BB'))
 ```
 
-Kernel density homerange estimates appear to be the largest and a-LoCoH homerange estimates appear to be the smallest. Initially I could expect minimum convex polygon to hve the highest homerange size but that does not appear to be the case. The large size of the kernel density home range could be that outliers may pull the homerange a little closer towards them where as those points are simply excluded in the MCP estimates. Also if there are areas of high use by the panthers the kernels around those areas could be higher and potentially lead to a homerange estimate that is expanded past where the boarders of panther detections were. The a-LoCoH approach may have the smallest homerange estimate because it connects points into localized polygons based on where detections were. It is a modification of the minimum convex polygon method but only takes into account arease where detections occurred by merging ploygons together to create a homerange. Therefore, homerange estimates could be small since the polygons are closely related to only where detections occurred to create and merge polygons. Also, there is a possible human error element in selecting values of a that could lead to smaller polygons that are merged and potentially space left between the polygons.        
+Kernel density homerange estimates appear to be the largest and a-LoCoH homerange estimates appear to be the smallest. Initially I could expect minimum convex polygon to hve the highest homerange size but that does not appear to be the case. The large size of the kernel density home range could be that outliers may pull the homerange a little closer towards them where as those points are simply excluded in the MCP estimates. Also if there are areas of high use by the panthers the kernels around those areas could be higher and potentially lead to a homerange estimate that is expanded past where the boarders of panther detections were. The a-LoCoH approach may have the smallest homerange estimate because it connects points into localized polygons based on where detections were. It is a modification of the minimum convex polygon method but only takes into account arease where detections occurred by merging ploygons together to create a homerange. Therefore, homerange estimates could be small since the polygons are closely related to only where detections occurred to create and merge polygons. Also, there is a possible human error element in selecting values of a that could lead to smaller polygons that are merged and potentially space left between the polygons.  
+
+$\color{red}{\text{Great. +4}}$
 
 # Challenge 3 (3 points)
 
@@ -259,6 +262,8 @@ habMcp147wet
 ```
 
 Wet forest made up ~55% of the polygon and dry forest made up ~12% of the polygon. I do not think that these numbers represent the amount of wet and dry forest available to the panther because there may be areas within the polygon that are not accessible to the panther, for example roads/human activity deterring or natural barriers or areas defended by other panthers that may not be accessible to panther 147. Minimum convex polygon does not take into account how often a panther uses and area or the path it took to get to an area but includes all of the area within the boundaries of where the panther has been and may include areas where the panther can not access. For example, if a panther had to walk around an area it could not access that are would still be included in the polygon. This could especially be an issue for a MCP homerange of 100% where even the maximum distances a panther traveled are included in the polygon and the border of the polygon to the next closest point may include a lot of land the panther did not use.    
+
+$\color{red}{\text{Excellent. +3}}$
 
 # Challenge 4 (6 points)
 
@@ -574,10 +579,13 @@ abline(h = 0.12, col = "red")
 
 No text needed
 
+$\color{red}{\text{Awesome. +6}}$
+
 # Challenge 5 (3 points)
 
 Does the panther you chose in Challenge 3/4 prefer dry and/or wet forest? What is your justification for your answer?
 
 Panther 147 seems to prefer dry forest over wet forest. I believe this because even though wet forest makes up more of the panthers homerange the amount of wet forest in the panthers homernage  is less than the amount of available as a whole to the panther at almost all home range sizes. The opposite is true for dry forest which is not very abundant on the landscape but makes up a large portion of the panthers homerange than what is available  at almost all homerange sizes. Therefore the panther may be selecting for dry forest even though it is not very abundant on the landscape and only makes up a small portion (<20%) of the land type in the panthers habitat. However, more information is needed to determine the importance of wet forest to panthers as smaller ("core") homeranges of panthers up to about 40% seem to have the amount of wet forest that would be expected based on random change due to prevalence of wet forest before quickly dropping with larger home range sizes. Finally, as discussed in challenge 3 the full extent of each forest type that exists may not be available to the panther so even though the panther uses dry forest proportionally more than it is available on the landscape this cold be because it is the habitat that is more available to the panther. The person collecting the data would have to consider this and may be able to address this concern but they may potentially need to mention it as a limitation if they can not show what habitat is available to the panther.           
+$\color{red}{\text{Great work. +3}}$
 
 
