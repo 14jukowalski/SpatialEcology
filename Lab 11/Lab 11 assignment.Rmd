@@ -136,6 +136,8 @@ selRatioII$wi
 ```
 The Wi and exponetiated values from logistic regression have similar trends in the relationship between use by panthers and land cover type. For example, forest land cover types have a high probability of use based on what is available based on the generalized linear model and was used more than expected based on the abundance of the habitat on the landscape (Wi >1). The differences in how I would interpret the exponentiated values from the Wi values is that exponentiated values would be the probability of panthers using each habitat type based on availability based on the locations where panthers were detected, with probabilities >1 being greater than expected and probabilities <1 being less than expected. I would interpret Wi values as how the panthers used each habitat type based on availability based on the locations of the panthers sampled with values >1 meaning panthers were found in those habitat types more than what would be expected based off of availability and values <1 mean panthers were found in those locations less than what would be expected based off of availability of that habitat type.  
 
+$\color{red}{\text{This isn't exactly correct. The exponentiated beta coefficients represent the odds ratios for the various cover types (i.e., the odds a point in that category is used divided by the odds is is not used). This is the same way that wi is calculated. The only difference here is that we're now including a random effect to account for non-independence among points selected by the same panther. +4}}$
+
 # Challenge 2 (5 points)
 
 In the lab, we used the distribution of step lengths and turning angles to help us devise potential steps each individual could have taken at each point in time. Instead of step lengths, build a histogram representing the distribution of step speeds in km/hr. When and why might you choose to sample from a distribution of step speeds to calculate potential step lengths rather than drawing from the distribution of step lengths itself?
@@ -174,6 +176,8 @@ hist(trajDf_km_hr)
 
 ```
 You may choose to use step speeds rather than distances if you are interested in how quickly animals move through the landscape rather than how far they move. For example, you could be interested in how quickly an animal moves though a landscape or how much time it may spend moving through habitat patches. In those cases distance moved may not be of interest and step speed would be a better suited for your research questions.    
+
+$\color{red}{\text{I was hoping to hear that these distances will specifically be useful for generating potential steps when the time between repeated fixes is not constant. +4}}$
 
 # Challenge 3 (5 points)
 
@@ -255,6 +259,8 @@ panther6strat
 ```
 Panther 100 took the most tortuous path, and panther 147 took the least tortuous path.  
 
+$\color{red}{\text{Good. +5}}$
+
 # Challenge 4 (5 points)
 
 For each panther, calculate the frequency with which locations were recorded as points per day. Plot path straightness as a function of frequency (there should be 6 points on this figure, one per panther). What relationship do you notice between these two variables, and why might that pattern be occurring?
@@ -276,3 +282,4 @@ plot(averageppd$average, straightness)
 The relationship in the data shows that more points recorded per day the higher the straightness index, although it is difficult to tell with only six data points. Honestly, this is the opposite of what I would expect, I would expect that more points would mean deviations from the straight line distance would be captured more often leading to increased distance traveled and more points farther away from the straight line path. but I will take a shot at explaining why this may be occurring. If points are taken more often they will more closely resemble the path of the panther. If the points more closely resemble the path of the panther, there will be less distance added to the track that the panther did not travel. 
 Another potential explanation for why Panther 100 took the most tortuous path, and panther 147 took the least tortuous path (although it does not have to do with frequency) is that based on the plots of panther movement panther 147 appears to have the largest distance between start and end points and panther 100 have very little distance between start and end points. As a result, any movement by panther 100 away from its start and end point will have a large effect on the straightness index, where as movements off of the straight line path by panther 147 would be more offset by the fact that the panther moved a farther total distance to its endpoint.         
 
+$\color{red}{\text{Yeah, your intuition is correct. This question turned out wonky. +5}}$
