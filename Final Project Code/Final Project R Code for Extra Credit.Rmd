@@ -1,0 +1,2421 @@
+---
+title: "Fianl project code for extra credit"
+author: "Justin Kowalski"
+date: "2024-04-30"
+output: html_document
+---
+Packages
+```{r}
+require(tidyverse)
+require(sf)
+require(tigris)
+require(geodata)
+require(terra)
+require(colorspace)
+require(tidyterra)
+require(ggnewscale)
+require(cowplot)
+require(FedData)
+require(ggspatial)
+require(adehabitatLT)
+require(ggplot2)
+require(adehabitatHR)
+require(dplyr)
+require(sp)
+```
+
+
+The first chunk of code is for making my map of Alabama. The second panel in the figure in my paper that has the receiver locations was created in Arcgis Pro. 
+```{r}
+claibornesf <- st_read("/vsicurl/https://github.com/14jukowalski/SpatialEcology/raw/main/Lab_2/Claiborne_shapefile/Claiborne.shp")
+plot(st_geometry(claibornesf))
+
+claiborne = st_bbox(claibornesf)
+claiborne
+
+claiborne = claiborne + c(-20000, -20000, 20000, 20000)
+claiborne
+
+claiborne = st_as_sfc(claiborne)
+plot(claiborne)
+
+Alabama = states() %>% 
+  filter(NAME=='Alabama')
+
+plot(st_geometry(Alabama))
+
+st_crs(Alabama)$proj4string
+
+Alabama = st_transform(Alabama, st_crs(claibornesf))
+
+plot(st_geometry(Alabama))
+plot(claiborne, col='red', add=T)
+
+zoomedOut = ggplot()+
+  geom_sf(data = Alabama)+
+  geom_sf(data = claiborne, fill=NA, color='red')+
+  annotation_scale(location="br")+
+  annotation_north_arrow(location = "tr")
+zoomedOut
+
+zoomedOut = zoomedOut +
+  theme_bw()+ #Gets rid of most of the colors
+  theme(panel.grid=element_blank(), #Removes the gridlines
+        axis.text=element_blank(), #Removes the axis text
+        axis.ticks=element_blank(), #Removes the axis tick marks
+        panel.border=element_blank()) #Removes the frame around the graph
+zoomedOut
+```
+
+First to make sure the simulatons ran correctly I ran one replicate of each simulation and plotted what each simulation looked like. Note: when I run the plot in R markdown I get an error that the figure margins are too large, but if I run the code in a R script with the large plot window it runs correctly.
+```{r}
+set.seed(6)
+a <- simm.mou(1:25, b=c(-87.5526154,31.61337824), sigma = diag(c(0.0036, 0.0036)),
+                       burst="Variable attraction")
+
+b <- simm.mou(1:50, b=c(-87.5526154,31.61337824), sigma = diag(c(0.0036, 0.0036)),
+              burst="Variable attraction")
+
+c <- simm.mou(1:75, b=c(-87.5526154,31.61337824),sigma = diag(c(0.0036, 0.0036)),
+              burst="Variable attraction")
+
+d <- simm.mou(1:100, b=c(-87.5526154,31.61337824),sigma = diag(c(0.0036, 0.0036)),
+              burst="Variable attraction")
+
+e <- simm.mou(1:150, b=c(-87.5526154,31.61337824), sigma = diag(c(0.0036, 0.0036)),
+              burst="Variable attraction")
+
+f <- simm.mou(1:200, b=c(-87.5526154,31.61337824), sigma = diag(c(0.0036, 0.0036)),
+              burst="Variable attraction")
+
+g <- simm.mou(1:250, b=c(-87.5526154,31.61337824), sigma = diag(c(0.0036, 0.0036)),
+              burst="Variable attraction")
+
+h <- simm.mou(1:300, b=c(-87.5526154,31.61337824), sigma = diag(c(0.0036, 0.0036)),
+              burst="Variable attraction")
+
+#plot of the simulations
+par(mfrow=c(3,3))
+aplot = plot(a, cex.main = 1.5, cex.lab = 1.5, cex.axis = 1.5, main = "25 points", ylab = "Latitude", xlab = "", addpoints = FALSE, perani = FALSE)
+bplot = plot(b, cex.main = 1.5, cex.lab = 1.5, cex.axis = 1.5, main = "50 points", ylab = "", xlab = "",addpoints = FALSE, perani = FALSE)
+cplot = plot(c, cex.main = 1.5, cex.lab = 1.5, cex.axis = 1.5, main = "75 points", ylab = "", xlab = "",addpoints = FALSE, perani = FALSE)
+dplot = plot(d, cex.main = 1.5, cex.lab = 1.5, cex.axis = 1.5, main = "100 points", ylab = "Latitude", xlab = "",addpoints = FALSE, perani = FALSE)
+eplot = plot(e, cex.main = 1.5, cex.lab = 1.5, cex.axis = 1.5, main = "150 points", ylab = "", xlab = "Longitude", addpoints = FALSE, perani = FALSE)
+fplot = plot(f, cex.main = 1.5, cex.lab = 1.5, cex.axis = 1.5, main = "200 points", ylab = "", xlab = "Longitude", addpoints = FALSE, perani = FALSE)
+gplot = plot(g, cex.main = 1.5, cex.lab = 1.5, cex.axis = 1.5, main = "250 points", ylab = "Latitude", xlab = "Longitude", addpoints = FALSE, perani = FALSE)
+hplot = plot(h, cex.main = 1.5, cex.lab = 1.5, cex.axis = 1.5, main = "300 points", ylab = "Latitude", xlab = "Longitude", addpoints = FALSE, perani = FALSE)
+
+```
+
+Next I ran one replication of each simulation (a-h) for each home range estimation method and plotted it to make sure the code worked and was correct.
+
+Start with minimum convext polygon
+```{r}
+#mcp
+#a
+x = a[[1]][["x"]]
+y = a[[1]][["y"]]
+
+adf = data.frame(x,y)
+adf = st_as_sf(x=adf, coords=c('x', 'y'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs") #Transforming simulated points to shapefile
+adf = st_transform(adf, crs = st_crs(6345)) ##Transforming NAD83 (2011) to UTM zone 16
+adf = adf %>% 
+  mutate(id = 1)
+aSp = as(adf, 'Spatial')
+amcp95 = mcp(aSp, percent = 95, unin='m', unout='km2') 
+amcp95
+
+
+#b
+bx = b[[1]][["x"]]
+by = b[[1]][["y"]]
+
+bdf = data.frame(bx,by)
+bdf = st_as_sf(x=bdf, coords=c('bx', 'by'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+bdf = st_transform(bdf, crs = st_crs(6345))
+bdf = bdf %>% 
+  mutate(id = 1)
+bSp = as(bdf, 'Spatial')
+bmcp95 = mcp(bSp, percent = 95, unin='m', unout='km2')
+bmcp95
+
+#c
+cx = c[[1]][["x"]]
+cy = c[[1]][["y"]]
+
+cdf = data.frame(cx,cy)
+cdf = st_as_sf(x=cdf, coords=c('cx', 'cy'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+cdf = st_transform(cdf, crs = st_crs(6345))
+cdf = cdf %>% 
+  mutate(id = 1)
+cSp = as(cdf, 'Spatial')
+cmcp95 = mcp(cSp, percent = 95, unin='m', unout='km2')
+cmcp95
+
+#d
+dx = d[[1]][["x"]]
+dy = d[[1]][["y"]]
+
+ddf = data.frame(dx,dy)
+ddf = st_as_sf(x=ddf, coords=c('dx', 'dy'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+ddf = st_transform(ddf, crs = st_crs(6345))
+ddf = ddf %>% 
+  mutate(id = 1)
+dSp = as(ddf, 'Spatial')
+dmcp95 = mcp(dSp, percent = 95, unin='m', unout='km2')
+dmcp95
+
+#e
+ex = e[[1]][["x"]]
+ey = e[[1]][["y"]]
+
+edf = data.frame(ex,ey)
+edf = st_as_sf(x=edf, coords=c('ex', 'ey'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+edf = st_transform(edf, crs = st_crs(6345))
+edf = edf %>% 
+  mutate(id = 1)
+eSp = as(edf, 'Spatial')
+emcp95 = mcp(eSp, percent = 95, unin='m', unout='km2')
+emcp95
+
+#f
+fx = f[[1]][["x"]]
+fy = f[[1]][["y"]]
+
+fdf = data.frame(fx,fy)
+fdf = st_as_sf(x=fdf, coords=c('fx', 'fy'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+fdf = st_transform(fdf, crs = st_crs(6345))
+fdf = fdf %>% 
+  mutate(id = 1)
+fSp = as(fdf, 'Spatial')
+fmcp95 = mcp(fSp, percent = 95, unin='m', unout='km2')
+fmcp95
+
+#g
+gx = g[[1]][["x"]]
+gy = g[[1]][["y"]]
+
+gdf = data.frame(gx,gy)
+gdf = st_as_sf(x=gdf, coords=c('gx', 'gy'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+gdf = st_transform(gdf, crs = st_crs(6345))
+gdf = gdf %>% 
+  mutate(id = 1)
+gSp = as(gdf, 'Spatial')
+gmcp95 = mcp(gSp, percent = 95, unin='m', unout='km2')
+gmcp95
+
+#h
+hx = h[[1]][["x"]]
+hy = h[[1]][["y"]]
+
+hdf = data.frame(hx,hy)
+hdf = st_as_sf(x=hdf, coords=c('hx', 'hy'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs") 
+hdf = st_transform(hdf, crs = st_crs(6345))
+hdf = hdf %>% 
+  mutate(id = 1)
+hSp = as(hdf, 'Spatial')
+hmcp95 = mcp(hSp, percent = 95, unin='m', unout='km2')
+hmcp95
+
+##plot of mcp
+mcps = c(amcp95$area, bmcp95$area, cmcp95$area, dmcp95$area, emcp95$area, fmcp95$area, gmcp95$area, hmcp95$area)
+xvals = c(25, 50, 75, 100, 150, 200, 250, 300)
+plot(xvals, mcps)
+```
+
+Kernel Density
+```{r}
+#kernel density
+#a
+akernelHrefEpa = kernelUD(aSp, h='href', kern='epa')
+kernel.area(akernelHrefEpa, unin = "m", unout = "km2")
+
+#b
+bkernelHrefEpa = kernelUD(bSp, h='href', kern='epa')
+kernel.area(bkernelHrefEpa, unin = "m", unout = "km2")
+
+#c
+ckernelHrefEpa = kernelUD(cSp, h='href', kern='epa')
+kernel.area(ckernelHrefEpa, unin = "m", unout = "km2")
+
+#d
+dkernelHrefEpa = kernelUD(dSp, h='href', kern='epa')
+kernel.area(dkernelHrefEpa, unin = "m", unout = "km2")
+
+#e
+ekernelHrefEpa = kernelUD(eSp, h='href', kern='epa')
+kernel.area(ekernelHrefEpa, unin = "m", unout = "km2")
+
+#f
+fkernelHrefEpa = kernelUD(fSp, h='href', kern='epa')
+kernel.area(fkernelHrefEpa, unin = "m", unout = "km2")
+
+#g
+gkernelHrefEpa = kernelUD(gSp, h='href', kern='epa')
+kernel.area(gkernelHrefEpa, unin = "m", unout = "km2")
+
+
+#h
+hkernelHrefEpa = kernelUD(hSp, h='href', kern='epa')
+kernel.area(hkernelHrefEpa, unin = "m", unout = "km2")
+
+
+#Kernel plot
+ke = c(2.44, 3.36, 2.68, 2.91, 3.43, 3.41, 3.95, 3.57)
+plot(xvals, ke)
+
+```
+
+And finally local convex hull
+```{r}
+#a-LoCoH
+#a
+aaInit = round(max(dist(coordinates(aSp))),0)
+aaSearch = seq(aaInit, 2*aaInit, by=100)
+alocohArange = LoCoH.a.area(SpatialPoints(coordinates(aSp)), arange=aaSearch)
+alocohA = LoCoH.a(SpatialPoints(coordinates(aSp)), a=aaSearch[5], unin = "m", unout = "km2")
+alocohASf = st_as_sf(alocohA)
+alocohA96Sf = alocohASf[23,]
+alocohA96Sf
+
+#b
+baInit = round(max(dist(coordinates(bSp))),0)
+baSearch = seq(baInit, 2*baInit, by=100)
+blocohArange = LoCoH.a.area(SpatialPoints(coordinates(bSp)), arange=baSearch)
+blocohA = LoCoH.a(SpatialPoints(coordinates(bSp)), a=baSearch[14], unin = "m", unout = "km2")
+blocohASf = st_as_sf(blocohA)
+blocohA94Sf = blocohASf[44,]
+blocohA94Sf
+
+#c
+caInit = round(max(dist(coordinates(cSp))),0)
+caSearch = seq(caInit, 2*caInit, by=100)
+clocohArange = LoCoH.a.area(SpatialPoints(coordinates(cSp)), arange=caSearch)
+clocohA = LoCoH.a(SpatialPoints(coordinates(cSp)), a=caSearch[16], unin = "m", unout = "km2")
+clocohASf = st_as_sf(clocohA)
+clocohA95Sf = clocohASf[63,]
+clocohA95Sf
+
+#d
+daInit = round(max(dist(coordinates(dSp))),0)
+daSearch = seq(daInit, 2*daInit, by=100)
+dlocohArange = LoCoH.a.area(SpatialPoints(coordinates(dSp)), arange=daSearch)
+dlocohA = LoCoH.a(SpatialPoints(coordinates(dSp)), a=daSearch[11], unin = "m", unout = "km2")
+dlocohASf = st_as_sf(dlocohA)
+dlocohA96Sf = dlocohASf[79,]
+dlocohA96Sf
+
+#e
+eaInit = round(max(dist(coordinates(eSp))),0)
+eaSearch = seq(eaInit, 2*eaInit, by=100)
+elocohArange = LoCoH.a.area(SpatialPoints(coordinates(eSp)), arange=eaSearch)
+elocohA = LoCoH.a(SpatialPoints(coordinates(eSp)), a=eaSearch[23], unin = "m", unout = "km2")
+elocohASf = st_as_sf(elocohA)
+elocohA95Sf = elocohASf[127,]
+elocohA95Sf
+
+#f
+faInit = round(max(dist(coordinates(fSp))),0)
+faSearch = seq(faInit, 2*faInit, by=100)
+flocohArange = LoCoH.a.area(SpatialPoints(coordinates(fSp)), arange=faSearch)
+flocohA = LoCoH.a(SpatialPoints(coordinates(fSp)), a=faSearch[19], unin = "m", unout = "km2")
+flocohASf = st_as_sf(flocohA)
+flocohA95Sf = flocohASf[149,]
+flocohA95Sf
+
+#g
+gaInit = round(max(dist(coordinates(gSp))),0)
+gaSearch = seq(gaInit, 2*gaInit, by=100)
+glocohArange = LoCoH.a.area(SpatialPoints(coordinates(gSp)), arange=gaSearch)
+glocohA = LoCoH.a(SpatialPoints(coordinates(gSp)), a=gaSearch[16], unin = "m", unout = "km2")
+glocohASf = st_as_sf(glocohA)
+glocohA95Sf = glocohASf[204,]
+glocohA95Sf
+
+#h
+haInit = round(max(dist(coordinates(hSp))),0)
+haSearch = seq(haInit, 2*haInit, by=100)
+hlocohArange = LoCoH.a.area(SpatialPoints(coordinates(hSp)), arange=haSearch)
+hlocohA = LoCoH.a(SpatialPoints(coordinates(hSp)), a=haSearch[20], unin = "m", unout = "km2")
+hlocohASf = st_as_sf(hlocohA)
+hlocohA95Sf = hlocohASf[258,]
+hlocohA95Sf
+
+#a-LoCoH plot
+alocoh = c(0.88, 1.49, 1.40, 1.64, 2.34, 2.34, 2.81, 2.66)
+plot(xvals, alocoh)
+```
+
+Next I tried a different sigma value in my simulations to determine how that may influence my home range estimations in the Claiborne Lock and Dam tailrace. I then created home range estimates using the minimum convex polygon method and a plot of the values to compare to the first sigma I used.
+```{r}
+set.seed(6)
+a2 <- simm.mou(1:25, b=c(-87.5526154,31.61337824), sigma = diag(c(0.0003, 0.0003)),
+              burst="Variable attraction")
+
+b2 <- simm.mou(1:50, b=c(-87.5526154,31.61337824), sigma = diag(c(0.0003, 0.0003)),
+              burst="Variable attraction")
+
+c2 <- simm.mou(1:75, b=c(-87.5526154,31.61337824),sigma = diag(c(0.0003, 0.0003)),
+              burst="Variable attraction")
+
+d2 <- simm.mou(1:100, b=c(-87.5526154,31.61337824),sigma = diag(c(0.0003, 0.0003)),
+              burst="Variable attraction")
+
+e2 <- simm.mou(1:150, b=c(-87.5526154,31.61337824), sigma = diag(c(0.0003, 0.0003)),
+              burst="Variable attraction")
+
+f2 <- simm.mou(1:200, b=c(-87.5526154,31.61337824), sigma = diag(c(0.0003, 0.0003)),
+              burst="Variable attraction")
+
+g2 <- simm.mou(1:250, b=c(-87.5526154,31.61337824), sigma = diag(c(0.0003, 0.0003)),
+              burst="Variable attraction")
+
+h2 <- simm.mou(1:300, b=c(-87.5526154,31.61337824), sigma = diag(c(0.0003, 0.0003)),
+               burst = "Variable attraction")
+
+#a
+a2x = a2[[1]][["x"]]
+a2y = a2[[1]][["y"]]
+
+a2df = data.frame(a2x,a2y)
+a2df = st_as_sf(x=a2df, coords=c('a2x', 'a2y'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+a2df = st_transform(a2df, crs = st_crs(6345))
+a2df = a2df %>% 
+  mutate(id = 1)
+a2Sp = as(a2df, 'Spatial')
+a2mcp95 = mcp(a2Sp, percent = 95, unin='m', unout='km2')
+a2mcp95
+
+
+#b
+b2x = b2[[1]][["x"]]
+b2y = b2[[1]][["y"]]
+
+b2df = data.frame(b2x,b2y)
+b2df = st_as_sf(x=b2df, coords=c('b2x', 'b2y'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+b2df = st_transform(b2df, crs = st_crs(6345))
+b2df = b2df %>% 
+  mutate(id = 1)
+b2Sp = as(b2df, 'Spatial')
+b2mcp95 = mcp(b2Sp, percent = 95, unin='m', unout='km2')
+b2mcp95
+
+#c
+c2x = c2[[1]][["x"]]
+c2y = c2[[1]][["y"]]
+
+c2df = data.frame(c2x,c2y)
+c2df = st_as_sf(x=c2df, coords=c('c2x', 'c2y'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+c2df = st_transform(c2df, crs = st_crs(6345))
+c2df = c2df %>% 
+  mutate(id = 1)
+c2Sp = as(c2df, 'Spatial')
+c2mcp95 = mcp(c2Sp, percent = 95, unin='m', unout='km2')
+c2mcp95
+
+#d
+d2x = d2[[1]][["x"]]
+d2y = d2[[1]][["y"]]
+
+d2df = data.frame(d2x,d2y)
+d2df = st_as_sf(x=d2df, coords=c('d2x', 'd2y'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+d2df = st_transform(d2df, crs = st_crs(6345))
+d2df = d2df %>% 
+  mutate(id = 1)
+d2Sp = as(d2df, 'Spatial')
+d2mcp95 = mcp(d2Sp, percent = 95, unin='m', unout='km2')
+d2mcp95
+
+#e
+e2x = e2[[1]][["x"]]
+e2y = e2[[1]][["y"]]
+
+e2df = data.frame(e2x,e2y)
+e2df = st_as_sf(x=e2df, coords=c('e2x', 'e2y'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+e2df = st_transform(e2df, crs = st_crs(6345))
+e2df = e2df %>% 
+  mutate(id = 1)
+e2Sp = as(e2df, 'Spatial')
+e2mcp95 = mcp(e2Sp, percent = 95, unin='m', unout='km2')
+e2mcp95
+
+#f
+f2x = f2[[1]][["x"]]
+f2y = f2[[1]][["y"]]
+
+f2df = data.frame(f2x,f2y)
+f2df = st_as_sf(x=f2df, coords=c('f2x', 'f2y'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+f2df = st_transform(f2df, crs = st_crs(6345))
+f2df = f2df %>% 
+  mutate(id = 1)
+f2Sp = as(f2df, 'Spatial')
+f2mcp95 = mcp(f2Sp, percent = 95, unin='m', unout='km2')
+f2mcp95
+
+#g
+g2x = g2[[1]][["x"]]
+g2y = g2[[1]][["y"]]
+
+g2df = data.frame(g2x,g2y)
+g2df = st_as_sf(x=g2df, coords=c('g2x', 'g2y'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+g2df = st_transform(g2df, crs = st_crs(6345))
+g2df = g2df %>% 
+  mutate(id = 1)
+g2Sp = as(g2df, 'Spatial')
+g2mcp95 = mcp(g2Sp, percent = 95, unin='m', unout='km2')
+g2mcp95
+
+#h
+h2x = h2[[1]][["x"]]
+h2y = h2[[1]][["y"]]
+
+h2df = data.frame(h2x,h2y)
+h2df = st_as_sf(x=h2df, coords=c('h2x', 'h2y'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+h2df = st_transform(h2df, crs = st_crs(6345))
+h2df = h2df %>% 
+  mutate(id = 1)
+h2Sp = as(h2df, 'Spatial')
+h2mcp95 = mcp(h2Sp, percent = 95, unin='m', unout='km2')
+h2mcp95
+
+##plot of mcp
+mcps2 = c(a2mcp95$area, b2mcp95$area, c2mcp95$area, d2mcp95$area, e2mcp95$area, f2mcp95$area, g2mcp95$area, h2mcp95$area)
+xvals = c(25, 50, 75, 100, 150, 200, 250, 300)
+plot(xvals, mcps2)
+```
+
+I then moved into the main analysis of my paper which was calculating home range values for each simulated number of points (25-300) using 5 or 10 replicates of each of the home range estimation methods. I then plotted the mean value of the replicates for each simulated number of points (along with standard error) to analyze where the plateau occured in estimated home range size.
+
+First code to generate the replicates. Note: The order of the simulations is not in alphabetical order because I set the seed and since I ran c, d, e, f first I needed to add in a, b, g, h at the bottom to avoid changing the values for c, d, e, f. 
+```{r}
+set.seed(6)
+c <- replicate(10,simm.mou(1:75, b=c(-87.5526154,31.61337824),sigma = diag(c(0.0036, 0.0036)),
+              burst="Variable attraction"))
+d <- replicate(10,simm.mou(1:100, b=c(-87.5526154,31.61337824),sigma = diag(c(0.0036, 0.0036)),
+              burst="Variable attraction"))
+e <- replicate(10,simm.mou(1:150, b=c(-87.5526154,31.61337824), sigma = diag(c(0.0036, 0.0036)),
+              burst="Variable attraction"))
+f <- replicate(10,simm.mou(1:200, b=c(-87.5526154,31.61337824), sigma = diag(c(0.0036, 0.0036)),
+              burst="Variable attraction"))
+a <- replicate(10,simm.mou(1:25, b=c(-87.5526154,31.61337824),sigma = diag(c(0.0036, 0.0036)),
+                           burst="Variable attraction"))
+b <- replicate(10,simm.mou(1:50, b=c(-87.5526154,31.61337824),sigma = diag(c(0.0036, 0.0036)),
+                           burst="Variable attraction"))
+g <- replicate(10,simm.mou(1:250, b=c(-87.5526154,31.61337824),sigma = diag(c(0.0036, 0.0036)),
+                           burst="Variable attraction"))
+h <- replicate(10,simm.mou(1:300, b=c(-87.5526154,31.61337824),sigma = diag(c(0.0036, 0.0036)),
+                           burst="Variable attraction"))
+```
+
+Replicates and plot for estimates using the minimum convext polygon method. I ran 10 replicates and could not figure out how to get a for loop to work so I ran each one manually.
+```{r}
+#mcpr
+#a1
+ax1 = a[[1]][["x"]]
+ay1 = a[[1]][["y"]]
+
+adf1 = data.frame(ax1,ay1)
+adf1 = st_as_sf(x=adf1, coords=c('ax1', 'ay1'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+adf1 = st_transform(adf1, crs = st_crs(6345))
+adf1 = adf1 %>% 
+  mutate(id = 1)
+aSp1 = as(adf1, 'Spatial')
+amcp951 = mcp(aSp1, percent = 95, unin='m', unout='km2')
+amcp951
+
+#a2
+ax2 = a[[2]][["x"]]
+ay2 = a[[2]][["y"]]
+
+adf2 = data.frame(ax2,ay2)
+adf2 = st_as_sf(x=adf2, coords=c('ax2', 'ay2'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+adf2 = st_transform(adf2, crs = st_crs(6345))
+adf2 = adf2 %>% 
+  mutate(id = 1)
+aSp2 = as(adf2, 'Spatial')
+amcp952 = mcp(aSp2, percent = 95, unin='m', unout='km2')
+amcp952
+
+#a3
+ax3 = a[[3]][["x"]]
+ay3 = a[[3]][["y"]]
+
+adf3 = data.frame(ax3,ay3)
+adf3 = st_as_sf(x=adf3, coords=c('ax3', 'ay3'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+adf3 = st_transform(adf3, crs = st_crs(6345))
+adf3 = adf3 %>% 
+  mutate(id = 1)
+aSp3 = as(adf3, 'Spatial')
+amcp953 = mcp(aSp3, percent = 95, unin='m', unout='km2')
+amcp953
+
+#a4
+ax4 = a[[4]][["x"]]
+ay4 = a[[4]][["y"]]
+
+adf4 = data.frame(ax4,ay4)
+adf4 = st_as_sf(x=adf4, coords=c('ax4', 'ay4'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+adf4 = st_transform(adf4, crs = st_crs(6345))
+adf4 = adf4 %>% 
+  mutate(id = 1)
+aSp4 = as(adf4, 'Spatial')
+amcp954 = mcp(aSp4, percent = 95, unin='m', unout='km2')
+amcp954
+
+#a5
+ax5 = a[[5]][["x"]]
+ay5 = a[[5]][["y"]]
+
+adf5 = data.frame(ax5,ay5)
+adf5 = st_as_sf(x=adf5, coords=c('ax5', 'ay5'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+adf5 = st_transform(adf5, crs = st_crs(6345))
+adf5 = adf5 %>% 
+  mutate(id = 1)
+aSp5 = as(adf5, 'Spatial')
+amcp955 = mcp(aSp5, percent = 95, unin='m', unout='km2')
+amcp955
+
+#a6
+ax6 = a[[6]][["x"]]
+ay6 = a[[6]][["y"]]
+
+adf6 = data.frame(ax6,ay6)
+adf6 = st_as_sf(x=adf6, coords=c('ax6', 'ay6'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+adf6 = st_transform(adf6, crs = st_crs(6345))
+adf6 = adf6 %>% 
+  mutate(id = 1)
+aSp6 = as(adf6, 'Spatial')
+amcp956 = mcp(aSp6, percent = 95, unin='m', unout='km2')
+amcp956
+
+#a7
+ax7 = a[[7]][["x"]]
+ay7 = a[[7]][["y"]]
+
+adf7 = data.frame(ax7,ay7)
+adf7 = st_as_sf(x=adf7, coords=c('ax7', 'ay7'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+adf7 = st_transform(adf7, crs = st_crs(6345))
+adf7 = adf7 %>% 
+  mutate(id = 1)
+aSp7 = as(adf7, 'Spatial')
+amcp957 = mcp(aSp7, percent = 95, unin='m', unout='km2')
+amcp957
+
+#a8
+ax8 = a[[8]][["x"]]
+ay8 = a[[8]][["y"]]
+
+adf8 = data.frame(ax8,ay8)
+adf8 = st_as_sf(x=adf8, coords=c('ax8', 'ay8'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+adf8 = st_transform(adf8, crs = st_crs(6345))
+adf8 = adf8 %>% 
+  mutate(id = 1)
+aSp8 = as(adf8, 'Spatial')
+amcp958 = mcp(aSp8, percent = 95, unin='m', unout='km2')
+amcp958
+
+#a9
+ax9 = a[[9]][["x"]]
+ay9 = a[[9]][["y"]]
+
+adf9 = data.frame(ax9,ay9)
+adf9 = st_as_sf(x=adf9, coords=c('ax9', 'ay9'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+adf9 = st_transform(adf9, crs = st_crs(6345))
+adf9 = adf9 %>% 
+  mutate(id = 1)
+aSp9 = as(adf9, 'Spatial')
+amcp959 = mcp(aSp9, percent = 95, unin='m', unout='km2')
+amcp959
+
+#a10
+ax10 = a[[10]][["x"]]
+ay10 = a[[10]][["y"]]
+
+adf10 = data.frame(ax10,ay10)
+adf10 = st_as_sf(x=adf10, coords=c('ax10', 'ay10'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+adf10 = st_transform(adf10, crs = st_crs(6345))
+adf10 = adf10 %>% 
+  mutate(id = 1)
+aSp10 = as(adf10, 'Spatial')
+amcp9510 = mcp(aSp10, percent = 95, unin='m', unout='km2')
+amcp9510
+
+amcpr = c(amcp951, amcp952, amcp953, amcp953, amcp955, amcp956, amcp957, amcp958, amcp959, amcp9510)
+amcpr = c(1.197209, 0.6964358, 1.07218, 1.07218, 1.791486, 0.941122, 2.130329, 0.5753616, 0.7308309, 1.356868)
+
+#b1
+bx1 = b[[1]][["x"]]
+by1 = b[[1]][["y"]]
+
+bdf1 = data.frame(bx1,by1)
+bdf1 = st_as_sf(x=bdf1, coords=c('bx1', 'by1'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+bdf1 = st_transform(bdf1, crs = st_crs(6345))
+bdf1 = bdf1 %>% 
+  mutate(id = 1)
+bSp1 = as(bdf1, 'Spatial')
+bmcp951 = mcp(bSp1, percent = 95, unin='m', unout='km2')
+bmcp951
+
+#b2
+bx2 = b[[2]][["x"]]
+by2 = b[[2]][["y"]]
+
+bdf2 = data.frame(bx2,by2)
+bdf2 = st_as_sf(x=bdf2, coords=c('bx2', 'by2'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+bdf2 = st_transform(bdf2, crs = st_crs(6345))
+bdf2 = bdf2 %>% 
+  mutate(id = 1)
+bSp2 = as(bdf2, 'Spatial')
+bmcp952 = mcp(bSp2, percent = 95, unin='m', unout='km2')
+bmcp952
+
+#b3
+bx3 = b[[3]][["x"]]
+by3 = b[[3]][["y"]]
+
+bdf3 = data.frame(bx3,by3)
+bdf3 = st_as_sf(x=bdf3, coords=c('bx3', 'by3'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+bdf3 = st_transform(bdf3, crs = st_crs(6345))
+bdf3 = bdf3 %>% 
+  mutate(id = 1)
+bSp3 = as(bdf3, 'Spatial')
+bmcp953 = mcp(bSp3, percent = 95, unin='m', unout='km2')
+bmcp953
+
+#b4
+bx4 = b[[4]][["x"]]
+by4 = b[[4]][["y"]]
+
+bdf4 = data.frame(bx4,by4)
+bdf4 = st_as_sf(x=bdf4, coords=c('bx4', 'by4'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+bdf4 = st_transform(bdf4, crs = st_crs(6345))
+bdf4 = bdf4 %>% 
+  mutate(id = 1)
+bSp4 = as(bdf4, 'Spatial')
+bmcp954 = mcp(bSp4, percent = 95, unin='m', unout='km2')
+bmcp954
+
+#b5
+bx5 = b[[5]][["x"]]
+by5 = b[[5]][["y"]]
+
+bdf5 = data.frame(bx5,by5)
+bdf5 = st_as_sf(x=bdf5, coords=c('bx5', 'by5'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+bdf5 = st_transform(bdf5, crs = st_crs(6345))
+bdf5 = bdf5 %>% 
+  mutate(id = 1)
+bSp5 = as(bdf5, 'Spatial')
+bmcp955 = mcp(bSp5, percent = 95, unin='m', unout='km2')
+bmcp955
+
+#b6
+bx6 = b[[6]][["x"]]
+by6 = b[[6]][["y"]]
+
+bdf6 = data.frame(bx6,by6)
+bdf6 = st_as_sf(x=bdf6, coords=c('bx6', 'by6'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+bdf6 = st_transform(bdf6, crs = st_crs(6345))
+bdf6 = bdf6 %>% 
+  mutate(id = 1)
+bSp6 = as(bdf6, 'Spatial')
+bmcp956 = mcp(bSp6, percent = 95, unin='m', unout='km2')
+bmcp956
+
+#b7
+bx7 = b[[7]][["x"]]
+by7 = b[[7]][["y"]]
+
+bdf7 = data.frame(bx7,by7)
+bdf7 = st_as_sf(x=bdf7, coords=c('bx7', 'by7'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+bdf7 = st_transform(bdf7, crs = st_crs(6345))
+bdf7 = bdf7 %>% 
+  mutate(id = 1)
+bSp7 = as(bdf7, 'Spatial')
+bmcp957 = mcp(bSp7, percent = 95, unin='m', unout='km2')
+bmcp957
+
+#b8
+bx8 = b[[8]][["x"]]
+by8 = b[[8]][["y"]]
+
+bdf8 = data.frame(bx8,by8)
+bdf8 = st_as_sf(x=bdf8, coords=c('bx8', 'by8'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+bdf8 = st_transform(bdf8, crs = st_crs(6345))
+bdf8 = bdf8 %>% 
+  mutate(id = 1)
+bSp8 = as(bdf8, 'Spatial')
+bmcp958 = mcp(bSp8, percent = 95, unin='m', unout='km2')
+bmcp958
+
+#b9
+bx9 = b[[9]][["x"]]
+by9 = b[[9]][["y"]]
+
+bdf9 = data.frame(bx9,by9)
+bdf9 = st_as_sf(x=bdf9, coords=c('bx9', 'by9'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+bdf9 = st_transform(bdf9, crs = st_crs(6345))
+bdf9 = bdf9 %>% 
+  mutate(id = 1)
+bSp9 = as(bdf9, 'Spatial')
+bmcp959 = mcp(bSp9, percent = 95, unin='m', unout='km2')
+bmcp959
+
+#b10
+bx10 = b[[10]][["x"]]
+by10 = b[[10]][["y"]]
+
+bdf10 = data.frame(bx10,by10)
+bdf10 = st_as_sf(x=bdf10, coords=c('bx10', 'by10'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+bdf10 = st_transform(bdf10, crs = st_crs(6345))
+bdf10 = bdf10 %>% 
+  mutate(id = 1)
+bSp10 = as(bdf10, 'Spatial')
+bmcp9510 = mcp(bSp10, percent = 95, unin='m', unout='km2')
+bmcp9510
+
+bmcpr = c(bmcp951, bmcp952, bmcp953, bmcp953, bmcp955, bmcp956, bmcp957, bmcp958, bmcp959, bmcp9510)
+bmcpr = c(1.468075, 2.276676, 1.473686, 1.473686, 2.218867, 1.938019, 1.942093, 1.701421, 1.37549, 1.492744)
+
+#c1
+cx1 = c[[1]][["x"]]
+cy1 = c[[1]][["y"]]
+
+cdf1 = data.frame(cx1,cy1)
+cdf1 = st_as_sf(x=cdf1, coords=c('cx1', 'cy1'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+cdf1 = st_transform(cdf1, crs = st_crs(6345))
+cdf1 = cdf1 %>% 
+  mutate(id = 1)
+cSp1 = as(cdf1, 'Spatial')
+cmcp951 = mcp(cSp1, percent = 95, unin='m', unout='km2')
+cmcp951
+
+#c2
+cx2 = c[[2]][["x"]]
+cy2 = c[[2]][["y"]]
+
+cdf2 = data.frame(cx2,cy2)
+cdf2 = st_as_sf(x=cdf2, coords=c('cx2', 'cy2'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+cdf2 = st_transform(cdf2, crs = st_crs(6345))
+cdf2 = cdf2 %>% 
+  mutate(id = 1)
+cSp2 = as(cdf2, 'Spatial')
+cmcp952 = mcp(cSp2, percent = 95, unin='m', unout='km2')
+cmcp952
+
+#c3
+cx3 = c[[3]][["x"]]
+cy3 = c[[3]][["y"]]
+
+cdf3 = data.frame(cx3,cy3)
+cdf3 = st_as_sf(x=cdf3, coords=c('cx3', 'cy3'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+cdf3 = st_transform(cdf3, crs = st_crs(6345))
+cdf3 = cdf3 %>% 
+  mutate(id = 1)
+cSp3 = as(cdf3, 'Spatial')
+cmcp953 = mcp(cSp3, percent = 95, unin='m', unout='km2')
+cmcp953
+
+#c4
+cx4 = c[[4]][["x"]]
+cy4 = c[[4]][["y"]]
+
+cdf4 = data.frame(cx4,cy4)
+cdf4 = st_as_sf(x=cdf4, coords=c('cx4', 'cy4'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+cdf4 = st_transform(cdf4, crs = st_crs(6345))
+cdf4 = cdf4 %>% 
+  mutate(id = 1)
+cSp4 = as(cdf4, 'Spatial')
+cmcp954 = mcp(cSp4, percent = 95, unin='m', unout='km2')
+cmcp954
+
+#c5
+cx5 = c[[5]][["x"]]
+cy5 = c[[5]][["y"]]
+
+cdf5 = data.frame(cx5,cy5)
+cdf5 = st_as_sf(x=cdf5, coords=c('cx5', 'cy5'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+cdf5 = st_transform(cdf5, crs = st_crs(6345))
+cdf5 = cdf5 %>% 
+  mutate(id = 1)
+cSp5 = as(cdf5, 'Spatial')
+cmcp955 = mcp(cSp5, percent = 95, unin='m', unout='km2')
+cmcp955
+
+#c6
+cx6 = c[[6]][["x"]]
+cy6 = c[[6]][["y"]]
+
+cdf6 = data.frame(cx6,cy6)
+cdf6 = st_as_sf(x=cdf6, coords=c('cx6', 'cy6'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+cdf6 = st_transform(cdf6, crs = st_crs(6345))
+cdf6 = cdf6 %>% 
+  mutate(id = 1)
+cSp6 = as(cdf6, 'Spatial')
+cmcp956 = mcp(cSp6, percent = 95, unin='m', unout='km2')
+cmcp956
+
+#c7
+cx7 = c[[7]][["x"]]
+cy7 = c[[7]][["y"]]
+
+cdf7 = data.frame(cx7,cy7)
+cdf7 = st_as_sf(x=cdf7, coords=c('cx7', 'cy7'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+cdf7 = st_transform(cdf7, crs = st_crs(6345))
+cdf7 = cdf7 %>% 
+  mutate(id = 1)
+cSp7 = as(cdf7, 'Spatial')
+cmcp957 = mcp(cSp7, percent = 95, unin='m', unout='km2')
+cmcp957
+
+#c8
+cx8 = c[[8]][["x"]]
+cy8 = c[[8]][["y"]]
+
+cdf8 = data.frame(cx8,cy8)
+cdf8 = st_as_sf(x=cdf8, coords=c('cx8', 'cy8'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+cdf8 = st_transform(cdf8, crs = st_crs(6345))
+cdf8 = cdf8 %>% 
+  mutate(id = 1)
+cSp8 = as(cdf8, 'Spatial')
+cmcp958 = mcp(cSp8, percent = 95, unin='m', unout='km2')
+cmcp958
+
+#c9
+cx9 = c[[9]][["x"]]
+cy9 = c[[9]][["y"]]
+
+cdf9 = data.frame(cx9,cy9)
+cdf9 = st_as_sf(x=cdf9, coords=c('cx9', 'cy9'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+cdf9 = st_transform(cdf9, crs = st_crs(6345))
+cdf9 = cdf9 %>% 
+  mutate(id = 1)
+cSp9 = as(cdf9, 'Spatial')
+cmcp959 = mcp(cSp9, percent = 95, unin='m', unout='km2')
+cmcp959
+
+#c10
+cx10 = c[[10]][["x"]]
+cy10 = c[[10]][["y"]]
+
+cdf10 = data.frame(cx10,cy10)
+cdf10 = st_as_sf(x=cdf10, coords=c('cx10', 'cy10'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+cdf10 = st_transform(cdf10, crs = st_crs(6345))
+cdf10 = cdf10 %>% 
+  mutate(id = 1)
+cSp10 = as(cdf10, 'Spatial')
+cmcp9510 = mcp(cSp10, percent = 95, unin='m', unout='km2')
+cmcp9510
+
+cmcpr = c(cmcp951, cmcp952, cmcp953, cmcp953, cmcp955, cmcp956, cmcp957, cmcp958, cmcp959, cmcp9510)
+cmcpr = c(1.977485, 1.543886, 1.73541, 1.73541, 2.394656, 1.949021, 2.627219, 1.659036, 2.223331, 2.506538)
+
+#d1
+dx1 = d[[1]][["x"]]
+dy1 = d[[1]][["y"]]
+
+ddf1 = data.frame(dx1,dy1)
+ddf1 = st_as_sf(x=ddf1, coords=c('dx1', 'dy1'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+ddf1 = st_transform(ddf1, crs = st_crs(6345))
+ddf1 = ddf1 %>% 
+  mutate(id = 1)
+dSp1 = as(ddf1, 'Spatial')
+dmcp951 = mcp(dSp1, percent = 95, unin='m', unout='km2')
+dmcp951
+
+#d2
+dx2 = d[[2]][["x"]]
+dy2 = d[[2]][["y"]]
+
+ddf2 = data.frame(dx2,dy2)
+ddf2 = st_as_sf(x=ddf2, coords=c('dx2', 'dy2'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+ddf2 = st_transform(ddf2, crs = st_crs(6345))
+ddf2 = ddf2 %>% 
+  mutate(id = 1)
+dSp2 = as(ddf2, 'Spatial')
+dmcp952 = mcp(dSp2, percent = 95, unin='m', unout='km2')
+dmcp952
+
+#d3
+dx3 = d[[3]][["x"]]
+dy3 = d[[3]][["y"]]
+
+ddf3 = data.frame(dx3,dy3)
+ddf3 = st_as_sf(x=ddf3, coords=c('dx3', 'dy3'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+ddf3 = st_transform(ddf3, crs = st_crs(6345))
+ddf3 = ddf3 %>% 
+  mutate(id = 1)
+dSp3 = as(ddf3, 'Spatial')
+dmcp953 = mcp(dSp3, percent = 95, unin='m', unout='km2')
+dmcp953
+
+#d4
+dx4 = d[[4]][["x"]]
+dy4 = d[[4]][["y"]]
+
+ddf4 = data.frame(dx4,dy4)
+ddf4 = st_as_sf(x=ddf4, coords=c('dx4', 'dy4'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+ddf4 = st_transform(ddf4, crs = st_crs(6345))
+ddf4 = ddf4 %>% 
+  mutate(id = 1)
+dSp4 = as(ddf4, 'Spatial')
+dmcp954 = mcp(dSp4, percent = 95, unin='m', unout='km2')
+dmcp954
+
+#d5
+dx5 = d[[5]][["x"]]
+dy5 = d[[5]][["y"]]
+
+ddf5 = data.frame(dx5,dy5)
+ddf5 = st_as_sf(x=ddf5, coords=c('dx5', 'dy5'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+ddf5 = st_transform(ddf5, crs = st_crs(6345))
+ddf5 = ddf5 %>% 
+  mutate(id = 1)
+dSp5 = as(ddf5, 'Spatial')
+dmcp955 = mcp(dSp5, percent = 95, unin='m', unout='km2')
+dmcp955
+
+#d6
+dx6 = d[[6]][["x"]]
+dy6 = d[[6]][["y"]]
+
+ddf6 = data.frame(dx6,dy6)
+ddf6 = st_as_sf(x=ddf6, coords=c('dx6', 'dy6'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+ddf6 = st_transform(ddf6, crs = st_crs(6345))
+ddf6 = ddf6 %>% 
+  mutate(id = 1)
+dSp6 = as(ddf6, 'Spatial')
+dmcp956 = mcp(dSp6, percent = 95, unin='m', unout='km2')
+dmcp956
+
+#d7
+dx7 = d[[7]][["x"]]
+dy7 = d[[7]][["y"]]
+
+ddf7 = data.frame(dx7,dy7)
+ddf7 = st_as_sf(x=ddf7, coords=c('dx7', 'dy7'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+ddf7 = st_transform(ddf7, crs = st_crs(6345))
+ddf7 = ddf7 %>% 
+  mutate(id = 1)
+dSp7 = as(ddf7, 'Spatial')
+dmcp957 = mcp(dSp7, percent = 95, unin='m', unout='km2')
+dmcp957
+
+#d8
+dx8 = d[[8]][["x"]]
+dy8 = d[[8]][["y"]]
+
+ddf8 = data.frame(dx8,dy8)
+ddf8 = st_as_sf(x=ddf8, coords=c('dx8', 'dy8'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+ddf8 = st_transform(ddf8, crs = st_crs(6345))
+ddf8 = ddf8 %>% 
+  mutate(id = 1)
+dSp8 = as(ddf8, 'Spatial')
+dmcp958 = mcp(dSp8, percent = 95, unin='m', unout='km2')
+dmcp958
+
+#d9
+dx9 = d[[9]][["x"]]
+dy9 = d[[9]][["y"]]
+
+ddf9 = data.frame(dx9,dy9)
+ddf9 = st_as_sf(x=ddf9, coords=c('dx9', 'dy9'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+ddf9 = st_transform(ddf9, crs = st_crs(6345))
+ddf9 = ddf9 %>% 
+  mutate(id = 1)
+dSp9 = as(ddf9, 'Spatial')
+dmcp959 = mcp(dSp9, percent = 95, unin='m', unout='km2')
+dmcp959
+
+#d10
+dx10 = d[[10]][["x"]]
+dy10 = d[[10]][["y"]]
+
+ddf10 = data.frame(dx10,dy10)
+ddf10 = st_as_sf(x=ddf10, coords=c('dx10', 'dy10'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+ddf10 = st_transform(ddf10, crs = st_crs(6345))
+ddf10 = ddf10 %>% 
+  mutate(id = 1)
+dSp10 = as(ddf10, 'Spatial')
+dmcp9510 = mcp(dSp10, percent = 95, unin='m', unout='km2')
+dmcp9510
+
+dmcpr = c(dmcp951, dmcp952, dmcp953, dmcp953, dmcp955, dmcp956, dmcp957, dmcp958, dmcp959, dmcp9510)
+dmcpr = c(2.236249, 2.081231, 2.324957, 2.324957, 3.160921, 1.80207, 2.704384, 2.091046, 1.87733, 2.400218)
+
+#e1
+ex1 = e[[1]][["x"]]
+ey1 = e[[1]][["y"]]
+
+edf1 = data.frame(ex1,ey1)
+edf1 = st_as_sf(x=edf1, coords=c('ex1', 'ey1'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+edf1 = st_transform(edf1, crs = st_crs(6345))
+edf1 = edf1 %>% 
+  mutate(id = 1)
+eSp1 = as(edf1, 'Spatial')
+emcp951 = mcp(eSp1, percent = 95, unin='m', unout='km2')
+emcp951
+
+#e2
+ex2 = e[[2]][["x"]]
+ey2 = e[[2]][["y"]]
+
+edf2 = data.frame(ex2,ey2)
+edf2 = st_as_sf(x=edf2, coords=c('ex2', 'ey2'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+edf2 = st_transform(edf2, crs = st_crs(6345))
+edf2 = edf2 %>% 
+  mutate(id = 1)
+eSp2 = as(edf2, 'Spatial')
+emcp952 = mcp(eSp2, percent = 95, unin='m', unout='km2')
+emcp952
+
+#e3
+ex3 = e[[3]][["x"]]
+ey3 = e[[3]][["y"]]
+
+edf3 = data.frame(ex3,ey3)
+edf3 = st_as_sf(x=edf3, coords=c('ex3', 'ey3'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+edf3 = st_transform(edf3, crs = st_crs(6345))
+edf3 = edf3 %>% 
+  mutate(id = 1)
+eSp3 = as(edf3, 'Spatial')
+emcp953 = mcp(eSp3, percent = 95, unin='m', unout='km2')
+emcp953
+
+#e4
+ex4 = e[[4]][["x"]]
+ey4 = e[[4]][["y"]]
+
+edf4 = data.frame(ex4,ey4)
+edf4 = st_as_sf(x=edf4, coords=c('ex4', 'ey4'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+edf4 = st_transform(edf4, crs = st_crs(6345))
+edf4 = edf4 %>% 
+  mutate(id = 1)
+eSp4 = as(edf4, 'Spatial')
+emcp954 = mcp(eSp4, percent = 95, unin='m', unout='km2')
+emcp954
+
+#e5
+ex5 = e[[5]][["x"]]
+ey5 = e[[5]][["y"]]
+
+edf5 = data.frame(ex5,ey5)
+edf5 = st_as_sf(x=edf5, coords=c('ex5', 'ey5'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+edf5 = st_transform(edf5, crs = st_crs(6345))
+edf5 = edf5 %>% 
+  mutate(id = 1)
+eSp5 = as(edf5, 'Spatial')
+emcp955 = mcp(eSp5, percent = 95, unin='m', unout='km2')
+emcp955
+
+#e6
+ex6 = e[[6]][["x"]]
+ey6 = e[[6]][["y"]]
+
+edf6 = data.frame(ex6,ey6)
+edf6 = st_as_sf(x=edf6, coords=c('ex6', 'ey6'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+edf6 = st_transform(edf6, crs = st_crs(6345))
+edf6 = edf6 %>% 
+  mutate(id = 1)
+eSp6 = as(edf6, 'Spatial')
+emcp956 = mcp(eSp6, percent = 95, unin='m', unout='km2')
+emcp956
+
+#e7
+ex7 = e[[7]][["x"]]
+ey7 = e[[7]][["y"]]
+
+edf7 = data.frame(ex7,ey7)
+edf7 = st_as_sf(x=edf7, coords=c('ex7', 'ey7'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+edf7 = st_transform(edf7, crs = st_crs(6345))
+edf7 = edf7 %>% 
+  mutate(id = 1)
+eSp7 = as(edf7, 'Spatial')
+emcp957 = mcp(eSp7, percent = 95, unin='m', unout='km2')
+emcp957
+
+#e8
+ex8 = e[[8]][["x"]]
+ey8 = e[[8]][["y"]]
+
+edf8 = data.frame(ex8,ey8)
+edf8 = st_as_sf(x=edf8, coords=c('ex8', 'ey8'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+edf8 = st_transform(edf8, crs = st_crs(6345))
+edf8 = edf8 %>% 
+  mutate(id = 1)
+eSp8 = as(edf8, 'Spatial')
+emcp958 = mcp(eSp8, percent = 95, unin='m', unout='km2')
+emcp958
+
+#e9
+ex9 = e[[9]][["x"]]
+ey9 = e[[9]][["y"]]
+
+edf9 = data.frame(ex9,ey9)
+edf9 = st_as_sf(x=edf9, coords=c('ex9', 'ey9'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+edf9 = st_transform(edf9, crs = st_crs(6345))
+edf9 = edf9 %>% 
+  mutate(id = 1)
+eSp9 = as(edf9, 'Spatial')
+emcp959 = mcp(eSp9, percent = 95, unin='m', unout='km2')
+emcp959
+
+#e10
+ex10 = e[[10]][["x"]]
+ey10 = e[[10]][["y"]]
+
+edf10 = data.frame(ex10,ey10)
+edf10 = st_as_sf(x=edf10, coords=c('ex10', 'ey10'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+edf10 = st_transform(edf10, crs = st_crs(6345))
+edf10 = edf10 %>% 
+  mutate(id = 1)
+eSp10 = as(edf10, 'Spatial')
+emcp9510 = mcp(eSp10, percent = 95, unin='m', unout='km2')
+emcp9510
+
+emcpr = c(emcp951, emcp952, emcp953, emcp954, emcp955, emcp956, emcp957, emcp958, emcp959, emcp9510)
+emcpr = c(1.908731, 2.760063, 2.292604, 2.002508, 2.301427, 2.181799, 2.397608, 2.065257, 2.9055, 1.973988)
+
+#f1
+fx1 = f[[1]][["x"]]
+fy1 = f[[1]][["y"]]
+
+fdf1 = data.frame(fx1,fy1)
+fdf1 = st_as_sf(x=fdf1, coords=c('fx1', 'fy1'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+fdf1 = st_transform(fdf1, crs = st_crs(6345))
+fdf1 = fdf1 %>% 
+  mutate(id = 1)
+fSp1 = as(fdf1, 'Spatial')
+fmcp951 = mcp(fSp1, percent = 95, unin='m', unout='km2')
+fmcp951
+
+#f2
+fx2 = f[[2]][["x"]]
+fy2 = f[[2]][["y"]]
+
+fdf2 = data.frame(fx2,fy2)
+fdf2 = st_as_sf(x=fdf2, coords=c('fx2', 'fy2'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+fdf2 = st_transform(fdf2, crs = st_crs(6345))
+fdf2 = fdf2 %>% 
+  mutate(id = 1)
+fSp2 = as(fdf2, 'Spatial')
+fmcp952 = mcp(fSp2, percent = 95, unin='m', unout='km2')
+fmcp952
+
+#f3
+fx3 = f[[3]][["x"]]
+fy3 = f[[3]][["y"]]
+
+fdf3 = data.frame(fx3,fy3)
+fdf3 = st_as_sf(x=fdf3, coords=c('fx3', 'fy3'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+fdf3 = st_transform(fdf3, crs = st_crs(6345))
+fdf3 = fdf3 %>% 
+  mutate(id = 1)
+fSp3 = as(fdf3, 'Spatial')
+fmcp953 = mcp(fSp3, percent = 95, unin='m', unout='km2')
+fmcp953
+
+#f4
+fx4 = f[[4]][["x"]]
+fy4 = f[[4]][["y"]]
+
+fdf4 = data.frame(fx4,fy4)
+fdf4 = st_as_sf(x=fdf4, coords=c('fx4', 'fy4'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+fdf4 = st_transform(fdf4, crs = st_crs(6345))
+fdf4 = fdf4 %>% 
+  mutate(id = 1)
+fSp4 = as(fdf4, 'Spatial')
+fmcp954 = mcp(fSp4, percent = 95, unin='m', unout='km2')
+fmcp954
+
+#f5
+fx5 = f[[5]][["x"]]
+fy5 = f[[5]][["y"]]
+
+fdf5 = data.frame(fx5,fy5)
+fdf5 = st_as_sf(x=fdf5, coords=c('fx5', 'fy5'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+fdf5 = st_transform(fdf5, crs = st_crs(6345))
+fdf5 = fdf5 %>% 
+  mutate(id = 1)
+fSp5 = as(fdf5, 'Spatial')
+fmcp955 = mcp(fSp5, percent = 95, unin='m', unout='km2')
+fmcp955
+
+#f6
+fx6 = f[[6]][["x"]]
+fy6 = f[[6]][["y"]]
+
+fdf6 = data.frame(fx6,fy6)
+fdf6 = st_as_sf(x=fdf6, coords=c('fx6', 'fy6'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+fdf6 = st_transform(fdf6, crs = st_crs(6345))
+fdf6 = fdf6 %>% 
+  mutate(id = 1)
+fSp6 = as(fdf6, 'Spatial')
+fmcp956 = mcp(fSp6, percent = 95, unin='m', unout='km2')
+fmcp956
+
+#f7
+fx7 = f[[7]][["x"]]
+fy7 = f[[7]][["y"]]
+
+fdf7 = data.frame(fx7,fy7)
+fdf7 = st_as_sf(x=fdf7, coords=c('fx7', 'fy7'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+fdf7 = st_transform(fdf7, crs = st_crs(6345))
+fdf7 = fdf7 %>% 
+  mutate(id = 1)
+fSp7 = as(fdf7, 'Spatial')
+fmcp957 = mcp(fSp7, percent = 95, unin='m', unout='km2')
+fmcp957
+
+#f8
+fx8 = f[[8]][["x"]]
+fy8 = f[[8]][["y"]]
+
+fdf8 = data.frame(fx8,fy8)
+fdf8 = st_as_sf(x=fdf8, coords=c('fx8', 'fy8'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+fdf8 = st_transform(fdf8, crs = st_crs(6345))
+fdf8 = fdf8 %>% 
+  mutate(id = 1)
+fSp8 = as(fdf8, 'Spatial')
+fmcp958 = mcp(fSp8, percent = 95, unin='m', unout='km2')
+fmcp958
+
+#f9
+fx9 = f[[9]][["x"]]
+fy9 = f[[9]][["y"]]
+
+fdf9 = data.frame(fx9,fy9)
+fdf9 = st_as_sf(x=fdf9, coords=c('fx9', 'fy9'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+fdf9 = st_transform(fdf9, crs = st_crs(6345))
+fdf9 = fdf9 %>% 
+  mutate(id = 1)
+fSp9 = as(fdf9, 'Spatial')
+fmcp959 = mcp(fSp9, percent = 95, unin='m', unout='km2')
+fmcp959
+
+#f10
+fx10 = f[[10]][["x"]]
+fy10 = f[[10]][["y"]]
+
+fdf10 = data.frame(fx10,fy10)
+fdf10 = st_as_sf(x=fdf10, coords=c('fx10', 'fy10'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+fdf10 = st_transform(fdf10, crs = st_crs(6345))
+fdf10 = fdf10 %>% 
+  mutate(id = 1)
+fSp10 = as(fdf10, 'Spatial')
+fmcp9510 = mcp(fSp10, percent = 95, unin='m', unout='km2')
+fmcp9510
+
+fmcpr = c(fmcp951, fmcp952, fmcp953, fmcp953, fmcp955, fmcp956, fmcp957, fmcp958, fmcp959, fmcp9510)
+fmcpr = c(2.428763, 3.246098, 3.044447, 3.044447, 3.092492, 2.321403, 2.891613, 2.460962, 2.775681, 2.18651)
+
+#g1
+gx1 = g[[1]][["x"]]
+gy1 = g[[1]][["y"]]
+
+gdf1 = data.frame(gx1,gy1)
+gdf1 = st_as_sf(x=gdf1, coords=c('gx1', 'gy1'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+gdf1 = st_transform(gdf1, crs = st_crs(6345))
+gdf1 = gdf1 %>% 
+  mutate(id = 1)
+gSp1 = as(gdf1, 'Spatial')
+gmcp951 = mcp(gSp1, percent = 95, unin='m', unout='km2')
+gmcp951
+
+#g2
+gx2 = g[[2]][["x"]]
+gy2 = g[[2]][["y"]]
+
+gdf2 = data.frame(gx2,gy2)
+gdf2 = st_as_sf(x=gdf2, coords=c('gx2', 'gy2'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+gdf2 = st_transform(gdf2, crs = st_crs(6345))
+gdf2 = gdf2 %>% 
+  mutate(id = 1)
+gSp2 = as(gdf2, 'Spatial')
+gmcp952 = mcp(gSp2, percent = 95, unin='m', unout='km2')
+gmcp952
+
+#g3
+gx3 = g[[3]][["x"]]
+gy3 = g[[3]][["y"]]
+
+gdf3 = data.frame(gx3,gy3)
+gdf3 = st_as_sf(x=gdf3, coords=c('gx3', 'gy3'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+gdf3 = st_transform(gdf3, crs = st_crs(6345))
+gdf3 = gdf3 %>% 
+  mutate(id = 1)
+gSp3 = as(gdf3, 'Spatial')
+gmcp953 = mcp(gSp3, percent = 95, unin='m', unout='km2')
+gmcp953
+
+#g4
+gx4 = g[[4]][["x"]]
+gy4 = g[[4]][["y"]]
+
+gdf4 = data.frame(gx4,gy4)
+gdf4 = st_as_sf(x=gdf4, coords=c('gx4', 'gy4'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+gdf4 = st_transform(gdf4, crs = st_crs(6345))
+gdf4 = gdf4 %>% 
+  mutate(id = 1)
+gSp4 = as(gdf4, 'Spatial')
+gmcp954 = mcp(gSp4, percent = 95, unin='m', unout='km2')
+gmcp954
+
+#g5
+gx5 = g[[5]][["x"]]
+gy5 = g[[5]][["y"]]
+
+gdf5 = data.frame(gx5,gy5)
+gdf5 = st_as_sf(x=gdf5, coords=c('gx5', 'gy5'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+gdf5 = st_transform(gdf5, crs = st_crs(6345))
+gdf5 = gdf5 %>% 
+  mutate(id = 1)
+gSp5 = as(gdf5, 'Spatial')
+gmcp955 = mcp(gSp5, percent = 95, unin='m', unout='km2')
+gmcp955
+
+#g6
+gx6 = g[[6]][["x"]]
+gy6 = g[[6]][["y"]]
+
+gdf6 = data.frame(gx6,gy6)
+gdf6 = st_as_sf(x=gdf6, coords=c('gx6', 'gy6'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+gdf6 = st_transform(gdf6, crs = st_crs(6345))
+gdf6 = gdf6 %>% 
+  mutate(id = 1)
+gSp6 = as(gdf6, 'Spatial')
+gmcp956 = mcp(gSp6, percent = 95, unin='m', unout='km2')
+gmcp956
+
+#g7
+gx7 = g[[7]][["x"]]
+gy7 = g[[7]][["y"]]
+
+gdf7 = data.frame(gx7,gy7)
+gdf7 = st_as_sf(x=gdf7, coords=c('gx7', 'gy7'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+gdf7 = st_transform(gdf7, crs = st_crs(6345))
+gdf7 = gdf7 %>% 
+  mutate(id = 1)
+gSp7 = as(gdf7, 'Spatial')
+gmcp957 = mcp(gSp7, percent = 95, unin='m', unout='km2')
+gmcp957
+
+#g8
+gx8 = g[[8]][["x"]]
+gy8 = g[[8]][["y"]]
+
+gdf8 = data.frame(gx8,gy8)
+gdf8 = st_as_sf(x=gdf8, coords=c('gx8', 'gy8'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+gdf8 = st_transform(gdf8, crs = st_crs(6345))
+gdf8 = gdf8 %>% 
+  mutate(id = 1)
+gSp8 = as(gdf8, 'Spatial')
+gmcp958 = mcp(gSp8, percent = 95, unin='m', unout='km2')
+gmcp958
+
+#g9
+gx9 = g[[9]][["x"]]
+gy9 = g[[9]][["y"]]
+
+gdf9 = data.frame(gx9,gy9)
+gdf9 = st_as_sf(x=gdf9, coords=c('gx9', 'gy9'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+gdf9 = st_transform(gdf9, crs = st_crs(6345))
+gdf9 = gdf9 %>% 
+  mutate(id = 1)
+gSp9 = as(gdf9, 'Spatial')
+gmcp959 = mcp(gSp9, percent = 95, unin='m', unout='km2')
+gmcp959
+
+#g10
+gx10 = g[[10]][["x"]]
+gy10 = g[[10]][["y"]]
+
+gdf10 = data.frame(gx10,gy10)
+gdf10 = st_as_sf(x=gdf10, coords=c('gx10', 'gy10'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+gdf10 = st_transform(gdf10, crs = st_crs(6345))
+gdf10 = gdf10 %>% 
+  mutate(id = 1)
+gSp10 = as(gdf10, 'Spatial')
+gmcp9510 = mcp(gSp10, percent = 95, unin='m', unout='km2')
+gmcp9510
+
+gmcpr = c(gmcp951, gmcp952, gmcp953, gmcp953, gmcp955, gmcp956, gmcp957, gmcp958, gmcp959, gmcp9510)
+gmcpr = c(2.415072, 2.682696, 2.516929, 2.516929, 2.487853, 2.564221, 2.952137, 2.353423, 3.077237, 2.461938)
+
+#h1
+hx1 = h[[1]][["x"]]
+hy1 = h[[1]][["y"]]
+
+hdf1 = data.frame(hx1,hy1)
+hdf1 = st_as_sf(x=hdf1, coords=c('hx1', 'hy1'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+hdf1 = st_transform(hdf1, crs = st_crs(6345))
+hdf1 = hdf1 %>% 
+  mutate(id = 1)
+hSp1 = as(hdf1, 'Spatial')
+hmcp951 = mcp(hSp1, percent = 95, unin='m', unout='km2')
+hmcp951
+
+#h2
+hx2 = h[[2]][["x"]]
+hy2 = h[[2]][["y"]]
+
+hdf2 = data.frame(hx2,hy2)
+hdf2 = st_as_sf(x=hdf2, coords=c('hx2', 'hy2'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+hdf2 = st_transform(hdf2, crs = st_crs(6345))
+hdf2 = hdf2 %>% 
+  mutate(id = 1)
+hSp2 = as(hdf2, 'Spatial')
+hmcp952 = mcp(hSp2, percent = 95, unin='m', unout='km2')
+hmcp952
+
+#h3
+hx3 = h[[3]][["x"]]
+hy3 = h[[3]][["y"]]
+
+hdf3 = data.frame(hx3,hy3)
+hdf3 = st_as_sf(x=hdf3, coords=c('hx3', 'hy3'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+hdf3 = st_transform(hdf3, crs = st_crs(6345))
+hdf3 = hdf3 %>% 
+  mutate(id = 1)
+hSp3 = as(hdf3, 'Spatial')
+hmcp953 = mcp(hSp3, percent = 95, unin='m', unout='km2')
+hmcp953
+
+#h4
+hx4 = h[[4]][["x"]]
+hy4 = h[[4]][["y"]]
+
+hdf4 = data.frame(hx4,hy4)
+hdf4 = st_as_sf(x=hdf4, coords=c('hx4', 'hy4'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+hdf4 = st_transform(hdf4, crs = st_crs(6345))
+hdf4 = hdf4 %>% 
+  mutate(id = 1)
+hSp4 = as(hdf4, 'Spatial')
+hmcp954 = mcp(hSp4, percent = 95, unin='m', unout='km2')
+hmcp954
+
+#h5
+hx5 = h[[5]][["x"]]
+hy5 = h[[5]][["y"]]
+
+hdf5 = data.frame(hx5,hy5)
+hdf5 = st_as_sf(x=hdf5, coords=c('hx5', 'hy5'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+hdf5 = st_transform(hdf5, crs = st_crs(6345))
+hdf5 = hdf5 %>% 
+  mutate(id = 1)
+hSp5 = as(hdf5, 'Spatial')
+hmcp955 = mcp(hSp5, percent = 95, unin='m', unout='km2')
+hmcp955
+
+#h6
+hx6 = h[[6]][["x"]]
+hy6 = h[[6]][["y"]]
+
+hdf6 = data.frame(hx6,hy6)
+hdf6 = st_as_sf(x=hdf6, coords=c('hx6', 'hy6'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+hdf6 = st_transform(hdf6, crs = st_crs(6345))
+hdf6 = hdf6 %>% 
+  mutate(id = 1)
+hSp6 = as(hdf6, 'Spatial')
+hmcp956 = mcp(hSp6, percent = 95, unin='m', unout='km2')
+hmcp956
+
+#h7
+hx7 = h[[7]][["x"]]
+hy7 = h[[7]][["y"]]
+
+hdf7 = data.frame(hx7,hy7)
+hdf7 = st_as_sf(x=hdf7, coords=c('hx7', 'hy7'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+hdf7 = st_transform(hdf7, crs = st_crs(6345))
+hdf7 = hdf7 %>% 
+  mutate(id = 1)
+hSp7 = as(hdf7, 'Spatial')
+hmcp957 = mcp(hSp7, percent = 95, unin='m', unout='km2')
+hmcp957
+
+#h8
+hx8 = h[[8]][["x"]]
+hy8 = h[[8]][["y"]]
+
+hdf8 = data.frame(hx8,hy8)
+hdf8 = st_as_sf(x=hdf8, coords=c('hx8', 'hy8'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+hdf8 = st_transform(hdf8, crs = st_crs(6345))
+hdf8 = hdf8 %>% 
+  mutate(id = 1)
+hSp8 = as(hdf8, 'Spatial')
+hmcp958 = mcp(hSp8, percent = 95, unin='m', unout='km2')
+hmcp958
+
+#h9
+hx9 = h[[9]][["x"]]
+hy9 = h[[9]][["y"]]
+
+hdf9 = data.frame(hx9,hy9)
+hdf9 = st_as_sf(x=hdf9, coords=c('hx9', 'hy9'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+hdf9 = st_transform(hdf9, crs = st_crs(6345))
+hdf9 = hdf9 %>% 
+  mutate(id = 1)
+hSp9 = as(hdf9, 'Spatial')
+hmcp959 = mcp(hSp9, percent = 95, unin='m', unout='km2')
+hmcp959
+
+#h10
+hx10 = h[[10]][["x"]]
+hy10 = h[[10]][["y"]]
+
+hdf10 = data.frame(hx10,hy10)
+hdf10 = st_as_sf(x=hdf10, coords=c('hx10', 'hy10'), crs = "+proj=longlat +datum=NAD83 +no_defs +type=crs")
+hdf10 = st_transform(hdf10, crs = st_crs(6345))
+hdf10 = hdf10 %>% 
+  mutate(id = 1)
+hSp10 = as(hdf10, 'Spatial')
+hmcp9510 = mcp(hSp10, percent = 95, unin='m', unout='km2')
+hmcp9510
+
+hmcpr = c(hmcp951, hmcp952, hmcp953, hmcp953, hmcp955, hmcp956, hmcp957, hmcp958, hmcp959, hmcp9510)
+hmcpr = c(2.756813, 3.033749, 2.784158, 2.784158, 2.520014, 2.477614, 2.637883, 2.283295, 2.854224, 2.965071)
+
+
+mcpmeanvlas = c(mean(amcpr), mean(bmcpr), mean(cmcpr), mean(dmcpr), mean(emcpr), mean(fmcpr), mean(gmcpr), mean(hmcpr))
+
+amcpse = sd(amcpr)/sqrt(10)
+bmcpse = sd(bmcpr)/sqrt(10)
+cmcpse = sd(cmcpr)/sqrt(10)
+dmcpse = sd(dmcpr)/sqrt(10)
+emcpse = sd(emcpr)/sqrt(10)
+fmcpse = sd(fmcpr)/sqrt(10)
+gmcpse = sd(gmcpr)/sqrt(10)
+hmcpse = sd(hmcpr)/sqrt(10)
+semcpvals = c(amcpse, bmcpse, cmcpse, dmcpse, emcpse, fmcpse, gmcpse, hmcpse)
+semcpvals
+
+xvalsr = c(25, 50, 75, 100, 150, 200, 250, 300)
+plot(xvalsr, mcpmeanvlas, ylim=c(1, 3.5))
+arrows(x0=xvalsr, y0=mcpmeanvlas-semcpvals, x1=xvalsr, y1=mcpmeanvlas+semcpvals, code = 3, angle = 90, length = 0.1)
+
+mean(amcpr)
+mean(fmcpr)
+mean(dmcpr)
+mean(emcpr)
+```
+
+Replicates and plot for kernel density method. I ran 10 replicates and could not figure out how to get a for loop to work so I ran each one manually.
+```{r}
+#a1
+akernelHrefEpa1 = kernelUD(aSp1, h='href', kern='epa')
+aker1 = kernel.area(akernelHrefEpa1, unin = "m", unout = "km2")
+
+#a2
+akernelHrefEpa2 = kernelUD(aSp2, h='href', kern='epa')
+aker2 = kernel.area(akernelHrefEpa2, unin = "m", unout = "km2")
+
+#a3
+akernelHrefEpa3 = kernelUD(aSp3, h='href', kern='epa')
+aker3 = kernel.area(akernelHrefEpa3, unin = "m", unout = "km2")
+
+#a4
+akernelHrefEpa4 = kernelUD(aSp4, h='href', kern='epa')
+aker4 = kernel.area(akernelHrefEpa4, unin = "m", unout = "km2")
+
+#a5
+akernelHrefEpa5 = kernelUD(aSp5, h='href', kern='epa')
+aker5 = kernel.area(akernelHrefEpa5, unin = "m", unout = "km2")
+
+#a6
+akernelHrefEpa6 = kernelUD(aSp6, h='href', kern='epa')
+aker6 = kernel.area(akernelHrefEpa6, unin = "m", unout = "km2")
+
+#a7
+akernelHrefEpa7 = kernelUD(aSp7, h='href', kern='epa')
+aker7 = kernel.area(akernelHrefEpa7, unin = "m", unout = "km2")
+
+#a8
+akernelHrefEpa8 = kernelUD(aSp8, h='href', kern='epa')
+aker8 = kernel.area(akernelHrefEpa8, unin = "m", unout = "km2")
+
+#a9
+akernelHrefEpa9 = kernelUD(aSp9, h='href', kern='epa')
+aker9 = kernel.area(akernelHrefEpa9, unin = "m", unout = "km2")
+
+#a10
+akernelHrefEpa10 = kernelUD(aSp10, h='href', kern='epa')
+aker10 = kernel.area(akernelHrefEpa10, unin = "m", unout = "km2")
+
+akerr = c(aker1, aker2, aker3, aker4, aker5, aker6, aker7, aker8, aker9, aker10)
+akerr = c(2.8819002, 1.4220468, 2.6577203, 2.6807532, 3.4734644, 2.2605310, 4.8124193, 1.3919010, 1.7313579, 3.1259180)
+
+#b1
+bkernelHrefEpa1 = kernelUD(bSp1, h='href', kern='epa')
+bker1 = kernel.area(bkernelHrefEpa1, unin = "m", unout = "km2")
+
+#b2
+bkernelHrefEpa2 = kernelUD(bSp2, h='href', kern='epa')
+bker2 = kernel.area(bkernelHrefEpa2, unin = "m", unout = "km2")
+
+#b3
+bkernelHrefEpa3 = kernelUD(bSp3, h='href', kern='epa')
+bker3 = kernel.area(bkernelHrefEpa3, unin = "m", unout = "km2")
+
+#b4
+bkernelHrefEpa4 = kernelUD(bSp4, h='href', kern='epa')
+bker4 = kernel.area(bkernelHrefEpa4, unin = "m", unout = "km2")
+
+#b5
+bkernelHrefEpa5 = kernelUD(bSp5, h='href', kern='epa')
+bker5 = kernel.area(bkernelHrefEpa5, unin = "m", unout = "km2")
+
+#b6
+bkernelHrefEpa6 = kernelUD(bSp6, h='href', kern='epa')
+bker6 = kernel.area(bkernelHrefEpa6, unin = "m", unout = "km2")
+
+#b7
+bkernelHrefEpa7 = kernelUD(bSp7, h='href', kern='epa')
+bker7 = kernel.area(bkernelHrefEpa7, unin = "m", unout = "km2")
+
+#b8
+bkernelHrefEpa8 = kernelUD(bSp8, h='href', kern='epa')
+bker8 = kernel.area(bkernelHrefEpa8, unin = "m", unout = "km2")
+
+#b9
+bkernelHrefEpa9 = kernelUD(bSp9, h='href', kern='epa')
+bker9 = kernel.area(bkernelHrefEpa9, unin = "m", unout = "km2")
+
+#b10
+bkernelHrefEpa10 = kernelUD(bSp10, h='href', kern='epa')
+bker10 = kernel.area(bkernelHrefEpa10, unin = "m", unout = "km2")
+
+bkerr = c(bker1, bker2, bker3, bker4, bker5, bker6, bker7, bker8, bker9, bker10)
+bkerr = c(2.6913911, 3.9601967, 2.6079322, 2.4551913, 3.5002131, 3.5075323, 3.1207020, 3.4192926, 2.3998027, 2.7598414)
+
+#c1
+ckernelHrefEpa1 = kernelUD(cSp1, h='href', kern='epa')
+cker1 = kernel.area(ckernelHrefEpa1, unin = "m", unout = "km2")
+
+#c2
+ckernelHrefEpa2 = kernelUD(cSp2, h='href', kern='epa')
+cker2 = kernel.area(ckernelHrefEpa2, unin = "m", unout = "km2")
+
+#c3
+ckernelHrefEpa3 = kernelUD(cSp3, h='href', kern='epa')
+cker3 = kernel.area(ckernelHrefEpa3, unin = "m", unout = "km2")
+
+#c4
+ckernelHrefEpa4 = kernelUD(cSp4, h='href', kern='epa')
+cker4 = kernel.area(ckernelHrefEpa4, unin = "m", unout = "km2")
+
+#c5
+ckernelHrefEpa5 = kernelUD(cSp5, h='href', kern='epa')
+cker5 = kernel.area(ckernelHrefEpa5, unin = "m", unout = "km2")
+
+#c6
+ckernelHrefEpa6 = kernelUD(cSp6, h='href', kern='epa')
+cker6 = kernel.area(ckernelHrefEpa6, unin = "m", unout = "km2")
+
+#c7
+ckernelHrefEpa7 = kernelUD(cSp7, h='href', kern='epa')
+cker7 = kernel.area(ckernelHrefEpa7, unin = "m", unout = "km2")
+
+#c8
+ckernelHrefEpa8 = kernelUD(cSp8, h='href', kern='epa')
+cker8 = kernel.area(ckernelHrefEpa8, unin = "m", unout = "km2")
+
+#c9
+ckernelHrefEpa9 = kernelUD(cSp9, h='href', kern='epa')
+cker9 = kernel.area(ckernelHrefEpa9, unin = "m", unout = "km2")
+
+#c10
+ckernelHrefEpa10 = kernelUD(cSp10, h='href', kern='epa')
+cker10 = kernel.area(ckernelHrefEpa10, unin = "m", unout = "km2")
+
+ckerr = c(cker1, cker2, cker3, cker4, cker5, cker6, cker7, cker8, cker9, cker10)
+ckerr = c(3.3200572, 2.6826920, 2.8332523, 2.3488538, 3.9625030, 2.8720662, 4.1759604, 2.8321146, 3.5076719, 3.8803465)
+
+#d1
+dkernelHrefEpa1 = kernelUD(dSp1, h='href', kern='epa')
+dker1 = kernel.area(dkernelHrefEpa1, unin = "m", unout = "km2")
+
+#d2
+dkernelHrefEpa2 = kernelUD(dSp2, h='href', kern='epa')
+dker2 = kernel.area(dkernelHrefEpa2, unin = "m", unout = "km2")
+
+#d3
+dkernelHrefEpa3 = kernelUD(dSp3, h='href', kern='epa')
+dker3 = kernel.area(dkernelHrefEpa3, unin = "m", unout = "km2")
+
+#d4
+dkernelHrefEpa4 = kernelUD(dSp4, h='href', kern='epa')
+dker4 = kernel.area(dkernelHrefEpa4, unin = "m", unout = "km2")
+
+#d5
+dkernelHrefEpa5 = kernelUD(dSp5, h='href', kern='epa')
+dker5 = kernel.area(dkernelHrefEpa5, unin = "m", unout = "km2")
+
+#d6
+dkernelHrefEpa6 = kernelUD(dSp6, h='href', kern='epa')
+dker6 = kernel.area(dkernelHrefEpa6, unin = "m", unout = "km2")
+
+#d7
+dkernelHrefEpa7 = kernelUD(dSp7, h='href', kern='epa')
+dker7 = kernel.area(dkernelHrefEpa7, unin = "m", unout = "km2")
+
+#d8
+dkernelHrefEpa8 = kernelUD(dSp8, h='href', kern='epa')
+dker8 = kernel.area(dkernelHrefEpa8, unin = "m", unout = "km2")
+
+#d9
+dkernelHrefEpa9 = kernelUD(dSp9, h='href', kern='epa')
+dker9 = kernel.area(dkernelHrefEpa9, unin = "m", unout = "km2")
+
+#d10
+dkernelHrefEpa10 = kernelUD(dSp10, h='href', kern='epa')
+dker10 = kernel.area(dkernelHrefEpa10, unin = "m", unout = "km2")
+
+dkerr = c(dker1, dker2, dker3, dker4, dker5, dker6, dker7, dker8, dker9, dker10)
+dkerr = c(3.3639520, 2.9692828, 3.6744953, 3.6319283, 3.9499692, 2.9275158, 3.8757002, 2.9854132, 2.8047696, 3.5655089)
+
+#e1
+ekernelHrefEpa1 = kernelUD(eSp1, h='href', kern='epa')
+eker1 = kernel.area(ekernelHrefEpa1, unin = "m", unout = "km2")
+
+#e2
+ekernelHrefEpa2 = kernelUD(eSp2, h='href', kern='epa')
+eker2 = kernel.area(ekernelHrefEpa2, unin = "m", unout = "km2")
+
+#e3
+ekernelHrefEpa3 = kernelUD(eSp3, h='href', kern='epa')
+eker3 = kernel.area(ekernelHrefEpa3, unin = "m", unout = "km2")
+
+#e4
+ekernelHrefEpa4 = kernelUD(eSp4, h='href', kern='epa')
+eker4 = kernel.area(ekernelHrefEpa4, unin = "m", unout = "km2")
+
+#e5
+ekernelHrefEpa5 = kernelUD(eSp5, h='href', kern='epa')
+eker5 = kernel.area(ekernelHrefEpa5, unin = "m", unout = "km2")
+
+#e6
+ekernelHrefEpa6 = kernelUD(eSp6, h='href', kern='epa')
+eker6 = kernel.area(ekernelHrefEpa6, unin = "m", unout = "km2")
+
+#e7
+ekernelHrefEpa7 = kernelUD(eSp7, h='href', kern='epa')
+eker7 = kernel.area(ekernelHrefEpa7, unin = "m", unout = "km2")
+
+#e8
+ekernelHrefEpa8 = kernelUD(eSp8, h='href', kern='epa')
+eker8 = kernel.area(ekernelHrefEpa8, unin = "m", unout = "km2")
+
+#e9
+ekernelHrefEpa9 = kernelUD(eSp9, h='href', kern='epa')
+eker9 = kernel.area(ekernelHrefEpa9, unin = "m", unout = "km2")
+
+#e10
+ekernelHrefEpa10 = kernelUD(eSp10, h='href', kern='epa')
+eker10 = kernel.area(ekernelHrefEpa10, unin = "m", unout = "km2")
+
+ekerr = c(eker1, eker2, eker3, eker4, eker5, eker6, eker7, eker8, eker9, eker10)
+ekerr = c(2.7341022, 3.8148132, 3.3070227, 2.9550158, 3.3971322, 3.1948494, 3.1646877, 2.8083924, 3.8718249, 3.0617832)
+
+#f1
+fkernelHrefEpa1 = kernelUD(fSp1, h='href', kern='epa')
+fker1 = kernel.area(fkernelHrefEpa1, unin = "m", unout = "km2")
+
+#f2
+fkernelHrefEpa2 = kernelUD(fSp2, h='href', kern='epa')
+fker2 = kernel.area(fkernelHrefEpa2, unin = "m", unout = "km2")
+
+#f3
+fkernelHrefEpa3 = kernelUD(fSp3, h='href', kern='epa')
+fker3 = kernel.area(fkernelHrefEpa3, unin = "m", unout = "km2")
+
+#f4
+fkernelHrefEpa4 = kernelUD(fSp4, h='href', kern='epa')
+fker4 = kernel.area(fkernelHrefEpa4, unin = "m", unout = "km2")
+
+#f5
+fkernelHrefEpa5 = kernelUD(fSp5, h='href', kern='epa')
+fker5 = kernel.area(fkernelHrefEpa5, unin = "m", unout = "km2")
+
+#f6
+fkernelHrefEpa6 = kernelUD(fSp6, h='href', kern='epa')
+fker6 = kernel.area(fkernelHrefEpa6, unin = "m", unout = "km2")
+
+#f7
+fkernelHrefEpa7 = kernelUD(fSp7, h='href', kern='epa')
+fker7 = kernel.area(fkernelHrefEpa7, unin = "m", unout = "km2")
+
+#f8
+fkernelHrefEpa8 = kernelUD(fSp8, h='href', kern='epa')
+fker8 = kernel.area(fkernelHrefEpa8, unin = "m", unout = "km2")
+
+#f9
+fkernelHrefEpa9 = kernelUD(fSp9, h='href', kern='epa')
+fker9 = kernel.area(fkernelHrefEpa9, unin = "m", unout = "km2")
+
+#f10
+fkernelHrefEpa10 = kernelUD(fSp10, h='href', kern='epa')
+fker10 = kernel.area(fkernelHrefEpa10, unin = "m", unout = "km2")
+
+fkerr = c(fker1, fker2, fker3, fker4, fker5, fker6, fker7, fker8, fker9, fker10)
+fkerr = c(3.1825345, 4.0660612, 3.9003211, 3.5278959, 3.8037414, 3.1504651, 3.8054025, 3.1622618, 3.7931163, 2.9982938)
+
+#g1
+gkernelHrefEpa1 = kernelUD(gSp1, h='href', kern='epa')
+gker1 = kernel.area(gkernelHrefEpa1, unin = "m", unout = "km2")
+
+#g2
+gkernelHrefEpa2 = kernelUD(gSp2, h='href', kern='epa')
+gker2 = kernel.area(gkernelHrefEpa2, unin = "m", unout = "km2")
+
+#g3
+gkernelHrefEpa3 = kernelUD(gSp3, h='href', kern='epa')
+gker3 = kernel.area(gkernelHrefEpa3, unin = "m", unout = "km2")
+
+#g4
+gkernelHrefEpa4 = kernelUD(gSp4, h='href', kern='epa')
+gker4 = kernel.area(gkernelHrefEpa4, unin = "m", unout = "km2")
+
+#g5
+gkernelHrefEpa5 = kernelUD(gSp5, h='href', kern='epa')
+gker5 = kernel.area(gkernelHrefEpa5, unin = "m", unout = "km2")
+
+#g6
+gkernelHrefEpa6 = kernelUD(gSp6, h='href', kern='epa')
+gker6 = kernel.area(gkernelHrefEpa6, unin = "m", unout = "km2")
+
+#g7
+gkernelHrefEpa7 = kernelUD(gSp7, h='href', kern='epa')
+gker7 = kernel.area(gkernelHrefEpa7, unin = "m", unout = "km2")
+
+#g8
+gkernelHrefEpa8 = kernelUD(gSp8, h='href', kern='epa')
+gker8 = kernel.area(gkernelHrefEpa8, unin = "m", unout = "km2")
+
+#g9
+gkernelHrefEpa9 = kernelUD(gSp9, h='href', kern='epa')
+gker9 = kernel.area(gkernelHrefEpa9, unin = "m", unout = "km2")
+
+#g10
+gkernelHrefEpa10 = kernelUD(gSp10, h='href', kern='epa')
+gker10 = kernel.area(gkernelHrefEpa10, unin = "m", unout = "km2")
+
+gkerr = c(gker1, gker2, gker3, gker4, gker5, gker6, gker7, gker8, gker9, gker10)
+gkerr = c(3.2626258, 3.6148884, 3.3471369, 3.5739246, 3.3571861, 3.3233439, 3.8426721, 3.1708048, 4.0312471, 3.2886415)
+
+#h1
+hkernelHrefEpa1 = kernelUD(hSp1, h='href', kern='epa')
+hker1 = kernel.area(hkernelHrefEpa1, unin = "m", unout = "km2")
+
+#h2
+hkernelHrefEpa2 = kernelUD(hSp2, h='href', kern='epa')
+hker2 = kernel.area(hkernelHrefEpa2, unin = "m", unout = "km2")
+
+
+#h3
+hkernelHrefEpa3 = kernelUD(hSp3, h='href', kern='epa')
+hker3 = kernel.area(hkernelHrefEpa3, unin = "m", unout = "km2")
+
+#h4
+hkernelHrefEpa4 = kernelUD(hSp4, h='href', kern='epa')
+hker4 = kernel.area(hkernelHrefEpa4, unin = "m", unout = "km2")
+
+#h5
+hkernelHrefEpa5 = kernelUD(hSp5, h='href', kern='epa')
+hker5 = kernel.area(hkernelHrefEpa5, unin = "m", unout = "km2")
+
+#h6
+hkernelHrefEpa6 = kernelUD(hSp6, h='href', kern='epa')
+hker6 = kernel.area(hkernelHrefEpa6, unin = "m", unout = "km2")
+
+#h7
+hkernelHrefEpa7 = kernelUD(hSp7, h='href', kern='epa')
+hker7 = kernel.area(hkernelHrefEpa7, unin = "m", unout = "km2")
+
+#h8
+hkernelHrefEpa8 = kernelUD(hSp8, h='href', kern='epa')
+hker8 = kernel.area(hkernelHrefEpa8, unin = "m", unout = "km2")
+
+#h9
+hkernelHrefEpa9 = kernelUD(hSp9, h='href', kern='epa')
+hker9 = kernel.area(hkernelHrefEpa9, unin = "m", unout = "km2")
+
+#h10
+hkernelHrefEpa10 = kernelUD(hSp10, h='href', kern='epa')
+hker10 = kernel.area(hkernelHrefEpa10, unin = "m", unout = "km2")
+
+hkerr = c(hker1, hker2, hker3, hker4, hker5, hker6, hker7, hker8, hker9, hker10)
+hkerr = c(3.5436085, 3.7327635, 3.4910436, 3.3613031, 3.0680060, 3.1827357, 3.4217309, 3.1193420, 3.6878728, 3.6223772)
+
+kerrmeanvlas = c(mean(akerr), mean(bkerr), mean(ckerr), mean(dkerr), mean(ekerr), mean(fkerr), mean(gkerr), mean(hkerr))
+
+akerse = sd(akerr)/sqrt(10)
+bkerse = sd(bkerr)/sqrt(10)
+ckerse = sd(ckerr)/sqrt(10)
+dkerse = sd(dkerr)/sqrt(10)
+ekerse = sd(ekerr)/sqrt(10)
+fkerse = sd(fkerr)/sqrt(10)
+gkerse = sd(gkerr)/sqrt(10)
+hkerse = sd(hkerr)/sqrt(10)
+sekervals = c(akerse, bkerse, ckerse, dkerse, ekerse, fkerse, gkerse, hkerse)
+
+plot(xvalsr, kerrmeanvlas, ylim=c(2.0, 4.0))
+arrows(x0=xvalsr, y0=kerrmeanvlas-sekervals, x1=xvalsr, y1=kerrmeanvlas+sekervals, code = 3, angle = 90, length = 0.1)
+
+mean(akerr)
+mean(fkerr)
+mean(dkerr)
+```
+
+Replicates and estimates using the local convex hull (a-locoh) method. I only ran 5 replicates of each simulated number of points because of how long it took the code to run. Because each time I ran the code I needed to use a different value of "a", using a for loop would not have worked for the local convex hull method. NOTE: This section of code takes a very long time to run
+```{r}
+#a-LoCoH
+#a1
+aaInit1 = round(max(dist(coordinates(aSp1))),0)
+aaSearch1 = seq(aaInit1, 2*aaInit1, by=100)
+alocohArange1 = LoCoH.a.area(SpatialPoints(coordinates(aSp1)), arange=aaSearch1)
+alocohA1 = LoCoH.a(SpatialPoints(coordinates(aSp1)), a=aaSearch1[8], unin = "m", unout = "km2")
+alocohASf1 = st_as_sf(alocohA1)
+alocohA92Sf1 = alocohASf1[22,]
+alocohA92Sf1
+
+#a2
+aaInit2 = round(max(dist(coordinates(aSp2))),0)
+aaSearch2 = seq(aaInit2, 2*aaInit2, by=100)
+alocohArange2 = LoCoH.a.area(SpatialPoints(coordinates(aSp2)), arange=aaSearch2)
+alocohA2 = LoCoH.a(SpatialPoints(coordinates(aSp2)), a=aaSearch2[12], unin = "m", unout = "km2")
+alocohASf2 = st_as_sf(alocohA2)
+alocohA96Sf2 = alocohASf2[16,]
+alocohA96Sf2
+
+#a3
+aaInit3 = round(max(dist(coordinates(aSp3))),0)
+aaSearch3 = seq(aaInit3, 2*aaInit3, by=100)
+alocohArange3 = LoCoH.a.area(SpatialPoints(coordinates(aSp3)), arange=aaSearch3)
+alocohA3 = LoCoH.a(SpatialPoints(coordinates(aSp3)), a=aaSearch3[7], unin = "m", unout = "km2")
+alocohASf3 = st_as_sf(alocohA3)
+alocohA100Sf3 = alocohASf3[23,]
+alocohA100Sf3
+
+#a4
+aaInit4 = round(max(dist(coordinates(aSp4))),0)
+aaSearch4 = seq(aaInit4, 2*aaInit4, by=100)
+alocohArange4 = LoCoH.a.area(SpatialPoints(coordinates(aSp4)), arange=aaSearch4)
+alocohA4 = LoCoH.a(SpatialPoints(coordinates(aSp4)), a=aaSearch4[16], unin = "m", unout = "km2")
+alocohASf4 = st_as_sf(alocohA4)
+alocohA96Sf4 = alocohASf4[16,]
+alocohA96Sf4
+
+#a5
+aaInit5 = round(max(dist(coordinates(aSp5))),0)
+aaSearch5 = seq(aaInit5, 2*aaInit5, by=100)
+alocohArange5 = LoCoH.a.area(SpatialPoints(coordinates(aSp5)), arange=aaSearch5)
+alocohA5 = LoCoH.a(SpatialPoints(coordinates(aSp5)), a=aaSearch5[17], unin = "m", unout = "km2")
+alocohASf5 = st_as_sf(alocohA5)
+alocohA96Sf5 = alocohASf5[22,]
+alocohA96Sf5
+
+#a6
+aaInit6 = round(max(dist(coordinates(aSp6))),0)
+aaSearch6 = seq(aaInit6, 2*aaInit6, by=100)
+alocohArange6 = LoCoH.a.area(SpatialPoints(coordinates(aSp6)), arange=aaSearch6)
+alocohA6 = LoCoH.a(SpatialPoints(coordinates(aSp6)), a=aaSearch6[8], unin = "m", unout = "km2")
+alocohASf6 = st_as_sf(alocohA6)
+alocohA96Sf6 = alocohASf6[14,]
+alocohA96Sf6
+
+#a7
+aaInit7 = round(max(dist(coordinates(aSp7))),0)
+aaSearch7 = seq(aaInit7, 2*aaInit7, by=100)
+alocohArange7 = LoCoH.a.area(SpatialPoints(coordinates(aSp7)), arange=aaSearch7)
+alocohA7 = LoCoH.a(SpatialPoints(coordinates(aSp7)), a=aaSearch7[12], unin = "m", unout = "km2")
+alocohASf7 = st_as_sf(alocohA7)
+alocohA96Sf7 = alocohASf7[19,]
+alocohA96Sf7
+
+#a8
+aaInit8 = round(max(dist(coordinates(aSp8))),0)
+aaSearch8 = seq(aaInit8, 2*aaInit8, by=100)
+alocohArange8 = LoCoH.a.area(SpatialPoints(coordinates(aSp8)), arange=aaSearch8)
+alocohA8 = LoCoH.a(SpatialPoints(coordinates(aSp8)), a=aaSearch8[10], unin = "m", unout = "km2")
+alocohASf8 = st_as_sf(alocohA8)
+alocohA96Sf8 = alocohASf8[17,]
+alocohA96Sf8
+
+#a9
+aaInit9 = round(max(dist(coordinates(aSp9))),0)
+aaSearch9 = seq(aaInit9, 2*aaInit9, by=100)
+alocohArange9 = LoCoH.a.area(SpatialPoints(coordinates(aSp9)), arange=aaSearch9)
+alocohA9 = LoCoH.a(SpatialPoints(coordinates(aSp9)), a=aaSearch9[11], unin = "m", unout = "km2")
+alocohASf9 = st_as_sf(alocohA9)
+alocohA96Sf9 = alocohASf9[13,]
+alocohA96Sf9
+
+#a10
+aaInit10 = round(max(dist(coordinates(aSp10))),0)
+aaSearch10 = seq(aaInit10, 2*aaInit10, by=100)
+alocohArange10 = LoCoH.a.area(SpatialPoints(coordinates(aSp10)), arange=aaSearch10)
+alocohA10 = LoCoH.a(SpatialPoints(coordinates(aSp10)), a=aaSearch10[22], unin = "m", unout = "km2")
+alocohASf10 = st_as_sf(alocohA10)
+alocohA100Sf10 = alocohASf10[20,]
+alocohA100Sf10
+
+alocoh = c(alocohA92Sf1, alocohA96Sf2, alocohA100Sf3, alocohA96Sf4, alocohA96Sf5)
+alocoh = c(1.008646, 0.5731333, 1.293166, 1.159358, 1.252994)
+
+#b1
+baInit1 = round(max(dist(coordinates(bSp1))),0)
+baSearch1 = seq(baInit1, 2*baInit1, by=100)
+blocohArange1 = LoCoH.a.area(SpatialPoints(coordinates(bSp1)), arange=baSearch1)
+blocohA1 = LoCoH.a(SpatialPoints(coordinates(bSp1)), a=baSearch1[14], unin = "m", unout = "km2")
+blocohASf1 = st_as_sf(blocohA1)
+blocohA96Sf1 = blocohASf1[40,]
+blocohA96Sf1
+
+#b2
+baInit2 = round(max(dist(coordinates(bSp2))),0)
+baSearch2 = seq(baInit2, 2*baInit2, by=100)
+blocohArange2 = LoCoH.a.area(SpatialPoints(coordinates(bSp2)), arange=baSearch2)
+blocohA2 = LoCoH.a(SpatialPoints(coordinates(bSp2)), a=baSearch2[27], unin = "m", unout = "km2")
+blocohASf2 = st_as_sf(blocohA2)
+blocohA96Sf2 = blocohASf2[43,]
+blocohA96Sf2
+
+#b3
+baInit3 = round(max(dist(coordinates(bSp3))),0)
+baSearch3 = seq(baInit3, 2*baInit3, by=100)
+blocohArange3 = LoCoH.a.area(SpatialPoints(coordinates(bSp3)), arange=baSearch3)
+blocohA3 = LoCoH.a(SpatialPoints(coordinates(bSp3)), a=baSearch3[7], unin = "m", unout = "km2")
+blocohASf3 = st_as_sf(blocohA3)
+blocohA96Sf3 = blocohASf3[39,]
+blocohA96Sf3
+
+#b4
+baInit4 = round(max(dist(coordinates(bSp4))),0)
+baSearch4 = seq(baInit4, 2*baInit4, by=100)
+blocohArange4 = LoCoH.a.area(SpatialPoints(coordinates(bSp4)), arange=baSearch4)
+blocohA4 = LoCoH.a(SpatialPoints(coordinates(bSp4)), a=baSearch4[11], unin = "m", unout = "km2")
+blocohASf4 = st_as_sf(blocohA4)
+blocohA96Sf4 = blocohASf4[43,]
+blocohA96Sf4
+
+#b5
+baInit5 = round(max(dist(coordinates(bSp5))),0)
+baSearch5 = seq(baInit5, 2*baInit5, by=100)
+blocohArange5 = LoCoH.a.area(SpatialPoints(coordinates(bSp5)), arange=baSearch5)
+blocohA5 = LoCoH.a(SpatialPoints(coordinates(bSp5)), a=baSearch5[12], unin = "m", unout = "km2")
+blocohASf5 = st_as_sf(blocohA5)
+blocohA96Sf5 = blocohASf5[37,]
+blocohA96Sf5
+
+blocoh = c(blocohA96Sf1, blocohA96Sf2, blocohA96Sf3, blocohA96Sf4, blocohA96Sf5)
+blocoh = c(1.373954, 2.097635, 1.236619, 1.171671, 1.699471)
+
+#c1
+caInit1 = round(max(dist(coordinates(cSp1))),0)
+caSearch1 = seq(caInit1, 2*caInit1, by=100)
+clocohArange1 = LoCoH.a.area(SpatialPoints(coordinates(cSp1)), arange=caSearch1)
+clocohA1 = LoCoH.a(SpatialPoints(coordinates(cSp1)), a=caSearch1[16], unin = "m", unout = "km2")
+clocohASf1 = st_as_sf(clocohA1)
+clocohA95Sf1 = clocohASf1[63,]
+clocohA95Sf1
+
+#c2
+caInit2 = round(max(dist(coordinates(cSp2))),0)
+caSearch2 = seq(caInit2, 2*caInit2, by=100)
+clocohArange2 = LoCoH.a.area(SpatialPoints(coordinates(cSp2)), arange=caSearch2)
+clocohA2 = LoCoH.a(SpatialPoints(coordinates(cSp2)), a=caSearch2[16], unin = "m", unout = "km2")
+clocohASf2 = st_as_sf(clocohA2)
+clocohA95Sf2 = clocohASf2[56,]
+clocohA95Sf2
+
+#c3
+caInit3 = round(max(dist(coordinates(cSp3))),0)
+caSearch3 = seq(caInit3, 2*caInit3, by=100)
+clocohArange3 = LoCoH.a.area(SpatialPoints(coordinates(cSp3)), arange=caSearch3)
+clocohA3 = LoCoH.a(SpatialPoints(coordinates(cSp3)), a=caSearch3[9], unin = "m", unout = "km2")
+clocohASf3 = st_as_sf(clocohA3)
+clocohA96Sf3 = clocohASf3[68,]
+clocohA96Sf3
+
+#c4
+caInit4 = round(max(dist(coordinates(cSp4))),0)
+caSearch4 = seq(caInit4, 2*caInit4, by=100)
+clocohArange4 = LoCoH.a.area(SpatialPoints(coordinates(cSp4)), arange=caSearch4)
+clocohA4 = LoCoH.a(SpatialPoints(coordinates(cSp4)), a=caSearch4[20], unin = "m", unout = "km2")
+clocohASf4 = st_as_sf(clocohA4)
+clocohA95Sf4 = clocohASf4[54,]
+clocohA95Sf4
+
+#c5
+caInit5 = round(max(dist(coordinates(cSp5))),0)
+caSearch5 = seq(caInit5, 2*caInit5, by=100)
+clocohArange5 = LoCoH.a.area(SpatialPoints(coordinates(cSp5)), arange=caSearch5)
+clocohA5 = LoCoH.a(SpatialPoints(coordinates(cSp5)), a=caSearch5[24], unin = "m", unout = "km2")
+clocohASf5 = st_as_sf(clocohA5)
+clocohA95Sf5 = clocohASf5[57,]
+clocohA95Sf5
+
+clocoh = c(clocohA95Sf1, clocohA95Sf2, clocohA96Sf3, clocohA95Sf4, clocohA95Sf5)
+clocoh = c(1.836921, 1.355225, 1.580981, 1.25825, 2.195709)
+
+#d1
+daInit1 = round(max(dist(coordinates(dSp1))),0)
+daSearch1 = seq(daInit1, 2*daInit1, by=100)
+dlocohArange1 = LoCoH.a.area(SpatialPoints(coordinates(dSp1)), arange=daSearch1)
+dlocohA1 = LoCoH.a(SpatialPoints(coordinates(dSp1)), a=daSearch1[26], unin = "m", unout = "km2")
+dlocohASf1 = st_as_sf(dlocohA1)
+dlocohA95Sf1 = dlocohASf1[74,]
+dlocohA95Sf1
+
+#d2
+daInit2 = round(max(dist(coordinates(dSp2))),0)
+daSearch2 = seq(daInit2, 2*daInit2, by=100)
+dlocohArange2 = LoCoH.a.area(SpatialPoints(coordinates(dSp2)), arange=daSearch2)
+dlocohA2 = LoCoH.a(SpatialPoints(coordinates(dSp2)), a=daSearch2[19], unin = "m", unout = "km2")
+dlocohASf2 = st_as_sf(dlocohA2)
+dlocohA95Sf2 = dlocohASf2[80,]
+dlocohA95Sf2
+
+#d3
+daInit3 = round(max(dist(coordinates(dSp3))),0)
+daSearch3 = seq(daInit3, 2*daInit3, by=100)
+dlocohArange3 = LoCoH.a.area(SpatialPoints(coordinates(dSp3)), arange=daSearch3)
+dlocohA3 = LoCoH.a(SpatialPoints(coordinates(dSp3)), a=daSearch3[12], unin = "m", unout = "km2")
+dlocohASf3 = st_as_sf(dlocohA3)
+dlocohA95Sf3 = dlocohASf3[80,]
+dlocohA95Sf3
+
+#d4
+daInit4 = round(max(dist(coordinates(dSp4))),0)
+daSearch4 = seq(daInit4, 2*daInit4, by=100)
+dlocohArange4 = LoCoH.a.area(SpatialPoints(coordinates(dSp4)), arange=daSearch4)
+dlocohA4 = LoCoH.a(SpatialPoints(coordinates(dSp4)), a=daSearch4[16], unin = "m", unout = "km2")
+dlocohASf4 = st_as_sf(dlocohA4)
+dlocohA95Sf4 = dlocohASf4[80,]
+dlocohA95Sf4
+
+#d5
+daInit5 = round(max(dist(coordinates(dSp5))),0)
+daSearch5 = seq(daInit5, 2*daInit5, by=100)
+dlocohArange5 = LoCoH.a.area(SpatialPoints(coordinates(dSp5)), arange=daSearch5)
+dlocohA5 = LoCoH.a(SpatialPoints(coordinates(dSp5)), a=daSearch5[22], unin = "m", unout = "km2")
+dlocohASf5 = st_as_sf(dlocohA5)
+dlocohA95Sf5 = dlocohASf5[83,]
+dlocohA95Sf5
+
+dlocoh = c(dlocohA95Sf1, dlocohA95Sf2, dlocohA95Sf3, dlocohA95Sf4, dlocohA95Sf5)
+dlocoh = c(1.987829, 1.869688, 2.227091, 2.100333, 2.328297)
+
+#e1
+eaInit1 = round(max(dist(coordinates(eSp1))),0)
+eaSearch1 = seq(eaInit1, 2*eaInit1, by=100)
+elocohArange1 = LoCoH.a.area(SpatialPoints(coordinates(eSp1)), arange=eaSearch1)
+elocohA1 = LoCoH.a(SpatialPoints(coordinates(eSp1)), a=eaSearch1[11], unin = "m", unout = "km2")
+elocohASf1 = st_as_sf(elocohA1)
+elocohA95Sf1 = elocohASf1[125,]
+elocohA95Sf1
+
+#e2
+eaInit2 = round(max(dist(coordinates(eSp2))),0)
+eaSearch2 = seq(eaInit2, 2*eaInit2, by=100)
+elocohArange2 = LoCoH.a.area(SpatialPoints(coordinates(eSp2)), arange=eaSearch2)
+elocohA2 = LoCoH.a(SpatialPoints(coordinates(eSp2)), a=eaSearch2[17], unin = "m", unout = "km2")
+elocohASf2 = st_as_sf(elocohA2)
+elocohA95Sf2 = elocohASf2[123,]
+elocohA95Sf2
+
+#e3
+eaInit3 = round(max(dist(coordinates(eSp3))),0)
+eaSearch3 = seq(eaInit3, 2*eaInit3, by=100)
+elocohArange3 = LoCoH.a.area(SpatialPoints(coordinates(eSp3)), arange=eaSearch3)
+elocohA3 = LoCoH.a(SpatialPoints(coordinates(eSp3)), a=eaSearch3[23], unin = "m", unout = "km2")
+elocohASf3 = st_as_sf(elocohA3)
+elocohA95Sf3 = elocohASf3[125,]
+elocohA95Sf3
+
+#e4
+eaInit4 = round(max(dist(coordinates(eSp4))),0)
+eaSearch4 = seq(eaInit4, 2*eaInit4, by=100)
+elocohArange4 = LoCoH.a.area(SpatialPoints(coordinates(eSp4)), arange=eaSearch4)
+elocohA4 = LoCoH.a(SpatialPoints(coordinates(eSp4)), a=eaSearch4[21], unin = "m", unout = "km2")
+elocohASf4 = st_as_sf(elocohA4)
+elocohA95Sf4 = elocohASf4[113,]
+elocohA95Sf4
+
+#e5
+eaInit5 = round(max(dist(coordinates(eSp5))),0)
+eaSearch5 = seq(eaInit5, 2*eaInit5, by=100)
+elocohArange5 = LoCoH.a.area(SpatialPoints(coordinates(eSp5)), arange=eaSearch5)
+elocohA5 = LoCoH.a(SpatialPoints(coordinates(eSp5)), a=eaSearch5[10], unin = "m", unout = "km2")
+elocohASf5 = st_as_sf(elocohA5)
+elocohA95Sf5 = elocohASf5[116,]
+elocohA95Sf5
+
+elocoh = c(elocohA95Sf1, elocohA95Sf2, elocohA95Sf3, elocohA95Sf4, elocohA95Sf5)
+elocoh = c(1.733512, 2.358944, 2.205587, 1.935492, 2.121135)
+
+#f1
+faInit1 = round(max(dist(coordinates(fSp1))),0)
+faSearch1 = seq(faInit1, 2*faInit1, by=100)
+flocohArange1 = LoCoH.a.area(SpatialPoints(coordinates(fSp1)), arange=faSearch1)
+flocohA1 = LoCoH.a(SpatialPoints(coordinates(fSp1)), a=faSearch1[20], unin = "m", unout = "km2")
+flocohASf1 = st_as_sf(flocohA1)
+flocohA95Sf1 = flocohASf1[158,]
+flocohA95Sf1
+
+#f2
+faInit2 = round(max(dist(coordinates(fSp2))),0)
+faSearch2 = seq(faInit2, 2*faInit2, by=100)
+flocohArange2 = LoCoH.a.area(SpatialPoints(coordinates(fSp2)), arange=faSearch2)
+flocohA2 = LoCoH.a(SpatialPoints(coordinates(fSp2)), a=faSearch2[20], unin = "m", unout = "km2")
+flocohASf2 = st_as_sf(flocohA2)
+flocohA95Sf2 = flocohASf2[169,]
+flocohA95Sf2
+
+#f3
+faInit3 = round(max(dist(coordinates(fSp3))),0)
+faSearch3 = seq(faInit3, 2*faInit3, by=100)
+flocohArange3 = LoCoH.a.area(SpatialPoints(coordinates(fSp3)), arange=faSearch3)
+flocohA3 = LoCoH.a(SpatialPoints(coordinates(fSp3)), a=faSearch3[26], unin = "m", unout = "km2")
+flocohASf3 = st_as_sf(flocohA3)
+flocohA95Sf3 = flocohASf3[157,]
+flocohA95Sf3
+
+#f4
+faInit4 = round(max(dist(coordinates(fSp4))),0)
+faSearch4 = seq(faInit4, 2*faInit4, by=100)
+flocohArange4 = LoCoH.a.area(SpatialPoints(coordinates(fSp4)), arange=faSearch4)
+flocohA4 = LoCoH.a(SpatialPoints(coordinates(fSp4)), a=faSearch4[19], unin = "m", unout = "km2")
+flocohASf4 = st_as_sf(flocohA4)
+flocohA95Sf4 = flocohASf4[168,]
+flocohA95Sf4
+
+#f5
+faInit5 = round(max(dist(coordinates(fSp5))),0)
+faSearch5 = seq(faInit5, 2*faInit5, by=100)
+flocohArange5 = LoCoH.a.area(SpatialPoints(coordinates(fSp5)), arange=faSearch5)
+flocohA5 = LoCoH.a(SpatialPoints(coordinates(fSp5)), a=faSearch5[17], unin = "m", unout = "km2")
+flocohASf5 = st_as_sf(flocohA5)
+flocohA95Sf5 = flocohASf5[170,]
+flocohA95Sf5
+
+flocoh = c(flocohA95Sf1, flocohA95Sf2, flocohA95Sf3, flocohA95Sf4, flocohA95Sf5)
+flocoh = c(2.2285, 2.773425, 2.731065, 2.25922, 2.634711)
+
+#g1
+gaInit1 = round(max(dist(coordinates(gSp1))),0)
+gaSearch1 = seq(gaInit1, 2*gaInit1, by=100)
+glocohArange1 = LoCoH.a.area(SpatialPoints(coordinates(gSp1)), arange=gaSearch1)
+glocohA1 = LoCoH.a(SpatialPoints(coordinates(gSp1)), a=gaSearch1[21], unin = "m", unout = "km2")
+glocohASf1 = st_as_sf(glocohA1)
+glocohA95Sf1 = glocohASf1[209,]
+glocohA95Sf1
+
+#g2
+gaInit2 = round(max(dist(coordinates(gSp2))),0)
+gaSearch2 = seq(gaInit2, 2*gaInit2, by=100)
+glocohArange2 = LoCoH.a.area(SpatialPoints(coordinates(gSp2)), arange=gaSearch2)
+glocohA2 = LoCoH.a(SpatialPoints(coordinates(gSp2)), a=gaSearch2[24], unin = "m", unout = "km2")
+glocohASf2 = st_as_sf(glocohA2)
+glocohA95Sf2 = glocohASf2[197,]
+glocohA95Sf2
+
+#g3
+gaInit3 = round(max(dist(coordinates(gSp3))),0)
+gaSearch3 = seq(gaInit3, 2*gaInit3, by=100)
+glocohArange3 = LoCoH.a.area(SpatialPoints(coordinates(gSp3)), arange=gaSearch3)
+glocohA3 = LoCoH.a(SpatialPoints(coordinates(gSp3)), a=gaSearch3[21], unin = "m", unout = "km2")
+glocohASf3 = st_as_sf(glocohA3)
+glocohA95Sf3 = glocohASf3[207,]
+glocohA95Sf3
+
+#g4
+gaInit4 = round(max(dist(coordinates(gSp4))),0)
+gaSearch4 = seq(gaInit4, 2*gaInit4, by=100)
+glocohArange4 = LoCoH.a.area(SpatialPoints(coordinates(gSp4)), arange=gaSearch4)
+glocohA4 = LoCoH.a(SpatialPoints(coordinates(gSp4)), a=gaSearch4[21], unin = "m", unout = "km2")
+glocohASf4 = st_as_sf(glocohA4)
+glocohA95Sf4 = glocohASf4[210,]
+glocohA95Sf4
+
+#g5
+gaInit5 = round(max(dist(coordinates(gSp5))),0)
+gaSearch5 = seq(gaInit5, 2*gaInit5, by=100)
+glocohArange5 = LoCoH.a.area(SpatialPoints(coordinates(gSp5)), arange=gaSearch5)
+glocohA5 = LoCoH.a(SpatialPoints(coordinates(gSp5)), a=gaSearch5[18], unin = "m", unout = "km2")
+glocohASf5 = st_as_sf(glocohA5)
+glocohA95Sf5 = glocohASf5[214,]
+glocohA95Sf5
+
+glocoh = c(glocohA95Sf1, glocohA95Sf2, glocohA95Sf3, glocohA95Sf4, glocohA95Sf5)
+glocoh = c(2.287755, 2.51144, 2.329861, 2.667579, 2.439136)
+
+#h1
+haInit1 = round(max(dist(coordinates(hSp1))),0)
+haSearch1 = seq(haInit1, 2*haInit1, by=100)
+hlocohArange1 = LoCoH.a.area(SpatialPoints(coordinates(hSp1)), arange=haSearch1)
+hlocohA1 = LoCoH.a(SpatialPoints(coordinates(hSp1)), a=haSearch1[26], unin = "m", unout = "km2")
+hlocohASf1 = st_as_sf(hlocohA1)
+hlocohA95Sf1 = hlocohASf1[242,]
+hlocohA95Sf1
+
+#h2
+haInit2 = round(max(dist(coordinates(hSp2))),0)
+haSearch2 = seq(haInit2, 2*haInit2, by=100)
+hlocohArange2 = LoCoH.a.area(SpatialPoints(coordinates(hSp2)), arange=haSearch2)
+hlocohA2 = LoCoH.a(SpatialPoints(coordinates(hSp2)), a=haSearch2[25], unin = "m", unout = "km2")
+hlocohASf2 = st_as_sf(hlocohA2)
+hlocohA95Sf2 = hlocohASf2[249,]
+hlocohA95Sf2
+
+#h3
+haInit3 = round(max(dist(coordinates(hSp3))),0)
+haSearch3 = seq(haInit3, 2*haInit3, by=100)
+hlocohArange3 = LoCoH.a.area(SpatialPoints(coordinates(hSp3)), arange=haSearch3)
+hlocohA3 = LoCoH.a(SpatialPoints(coordinates(hSp3)), a=haSearch3[17], unin = "m", unout = "km2")
+hlocohASf3 = st_as_sf(hlocohA3)
+hlocohA95Sf3 = hlocohASf3[251,]
+hlocohA95Sf3
+
+#h4
+haInit4 = round(max(dist(coordinates(hSp4))),0)
+haSearch4 = seq(haInit4, 2*haInit4, by=100)
+hlocohArange4 = LoCoH.a.area(SpatialPoints(coordinates(hSp4)), arange=haSearch4)
+hlocohA4 = LoCoH.a(SpatialPoints(coordinates(hSp4)), a=haSearch4[11], unin = "m", unout = "km2")
+hlocohASf4 = st_as_sf(hlocohA4)
+hlocohA95Sf4 = hlocohASf4[249,]
+hlocohA95Sf4
+
+#h5
+haInit5 = round(max(dist(coordinates(hSp5))),0)
+haSearch5 = seq(haInit5, 2*haInit5, by=100)
+hlocohArange5 = LoCoH.a.area(SpatialPoints(coordinates(hSp5)), arange=haSearch5)
+hlocohA5 = LoCoH.a(SpatialPoints(coordinates(hSp5)), a=haSearch5[24], unin = "m", unout = "km2")
+hlocohASf5 = st_as_sf(hlocohA5)
+hlocohA95Sf5 = hlocohASf5[241,]
+hlocohA95Sf5
+
+hlocoh = c(hlocohA95Sf1, hlocohA95Sf2, hlocohA95Sf3, hlocohA95Sf4, hlocohA95Sf5)
+hlocoh = c(2.638281, 2.710311, 2.515772, 2.35954, 2.138452)
+
+locohmeanvlas = c(mean(alocoh), mean(blocoh), mean(clocoh), mean(dlocoh), mean(elocoh), mean(flocoh), mean(glocoh), mean(hlocoh))
+
+alocohse = sd(alocoh)/sqrt(5)
+blocohse = sd(blocoh)/sqrt(5)
+clocohse = sd(clocoh)/sqrt(5)
+dlocohse = sd(dlocoh)/sqrt(5)
+elocohse = sd(elocoh)/sqrt(5)
+flocohse = sd(flocoh)/sqrt(5)
+glocohse = sd(glocoh)/sqrt(5)
+hlocohse = sd(hlocoh)/sqrt(5)
+selocohvals = c(alocohse, blocohse, clocohse, dlocohse, elocohse, flocohse, glocohse, hlocohse)
+
+plot(xvalsr, locohmeanvlas, ylim=c(0.75, 3.25))
+arrows(x0=xvalsr, y0=locohmeanvlas-selocohvals, x1=xvalsr, y1=locohmeanvlas+selocohvals, code = 3, angle = 90, length = 0.1)
+
+mean(alocoh)
+mean(flocoh)
+mean(dlocoh)
+mean(elocoh)
+
+```
+
